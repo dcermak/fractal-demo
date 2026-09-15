@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Distributed Fractal Renderer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/app.css">
+    <script type="module" src="/static/app.js"></script>
+  </head>
+  <body>
+    <main class="dashboard">
+      <header class="page-header">
+        <div class="heading">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>Distributed Renderer</h1>
+            <p>Mandelbrot · Computed across worker nodes</p>
+          </div>
+        </div>
+        <button id="render-button" type="button" disabled>RENDER <span aria-hidden="true">↻</span></button>
+      </header>
+
+      <section class="metrics" aria-label="Render statistics">
+        <div class="metric"><span>Workers</span><strong id="worker-count">—</strong></div>
+        <div class="metric"><span>Active requests</span><strong id="active-count">0</strong></div>
+        <div class="metric"><span>Painted tiles / s</span><strong id="paint-rate">0.0</strong></div>
+        <div class="metric progress-metric"><span>Frame progress</span><strong id="progress-text">—</strong></div>
+      </section>
+
+      <section class="render-panel" aria-label="Mandelbrot image">
+        <div class="toolbar">
+          <div class="formula">Mandelbrot <span>z → z² + c</span></div>
+          <label for="palette-select">Palette
+            <select id="palette-select" disabled aria-label="Image palette"></select>
+          </label>
+        </div>
+        <div id="viewport" class="viewport">
+          <canvas id="fractal-canvas" width="960" height="540" role="img" aria-label="Mandelbrot image, rendered tile by tile. Tile border colors identify the producing nodes."></canvas>
+          <div id="tile-overlay" class="tile-overlay" aria-hidden="true"></div>
+          <div id="empty-hint" class="empty-hint">Connecting to the gateway…</div>
+        </div>
+        <progress id="render-progress" value="0" max="1" aria-label="Painted tiles"></progress>
+        <div class="render-caption"><span id="geometry-text">Loading configuration…</span><span id="frame-text">Frame 1</span></div>
+      </section>
+
+      <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true" data-tone="waiting">
+        <span class="status-dot" aria-hidden="true"></span><span id="status-text">Connecting to the gateway…</span>
+      </div>
+
+      <section class="pool" aria-labelledby="pool-heading">
+        <div class="pool-header"><h2 id="pool-heading">Compute pool</h2><span>Tile borders identify the producing node</span></div>
+        <ul id="worker-legend" class="worker-legend"></ul>
+        <p id="pool-empty" class="pool-empty">Waiting for worker discovery.</p>
+      </section>
+      <footer>Completed tiles stay visible when workers lose contact. Each new frame computes the same view again.</footer>
+      <noscript><p class="noscript">Enable JavaScript to run the renderer.</p></noscript>
+    </main>
+  </body>
+</html>

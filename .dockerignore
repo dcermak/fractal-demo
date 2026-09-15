@@ -1,0 +1,11 @@
+**
+!Containerfile
+!pyproject.toml
+!uv.lock
+!.python-version
+!src/
+!src/fractal_demo/
+!src/fractal_demo/**
+**/__pycache__/
+**/*.pyc
+**/*.pyo

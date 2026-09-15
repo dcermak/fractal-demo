@@ -1,0 +1,42 @@
+# Local development: copy to config.toml and launch the two workers in README.md.
+# For the booth, list the actual host interfaces and node networks here.
+bind = ["127.0.0.1"]
+port = 8080
+node_networks = ["127.0.0.0/8"]
+worker_port = 8080
+expiry_seconds = 1.5
+proxy_limit = 5
+connect_timeout = 1.0
+upstream_timeout = 10.0
+default_palette = "cyber"
+render_limit = 5
+
+# Explicit development-only destinations; overrides are accepted only for loopback nodes.
+# These ports override worker_port. Match each named worker's --port exactly, even when
+# moving the gateway to another port. No worker target may point back to the gateway.
+# Remove this table when using the fixed host port on Kubernetes nodes.
+[local_worker_ports]
+worker-a = 8081
+worker-b = 8082
+
+[geometry]
+width = 960
+height = 540
+columns = 16
+rows = 9
+
+[view]
+xmin = -0.9
+ymin = 0.08
+pixel_size = 0.00025
+iterations = 800
+
+# Candidates: tune with healthy render times and visible booth behavior.
+[timing]
+poll_interval_ms = 500
+poll_timeout_ms = 2000
+render_timeout_ms = 12000
+cooldown_ms = 350
+lost_ms = 600
+dwell_ms = 1500
+rate_window_ms = 5000

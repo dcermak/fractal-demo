@@ -1,0 +1,95 @@
+# Copy to worker-daemonset.local.yaml and replace both REPLACE values before applying.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fractal-worker
+  namespace: fractal-demo
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fractal-worker
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fractal-worker
+    spec:
+      automountServiceAccountToken: false
+      # Provisional: measure admitted-work drain under the selected CPU limit.
+      terminationGracePeriodSeconds: 30
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values: [linux]
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: [amd64]
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
+      # If the GHCR package is private, create this secret separately and uncomment:
+      # imagePullSecrets:
+      #   - name: ghcr-pull
+      containers:
+        - name: worker
+          image: ghcr.io/REPLACE_OWNER/REPLACE_REPOSITORY@sha256:REPLACE_DIGEST
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: GATEWAY_URL
+              value: http://REPLACE_WITH_DEMO_PC_IP:8081
+            - name: WORKER_PORT
+              value: "8080"
+            - name: REGISTRATION_INTERVAL
+              value: "0.5"
+            - name: REGISTRATION_TIMEOUT
+              value: "2"
+          ports:
+            - name: http
+              containerPort: 8080
+              hostPort: 8080
+              protocol: TCP
+          # Candidates, to be measured on the booth PC with the selected workload.
+          resources:
+            requests:
+              cpu: "1"
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
