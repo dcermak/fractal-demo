@@ -18,6 +18,20 @@ function parseRoster(data) {
   return data.workers;
 }
 
+function makeTiles({ width, height, columns, rows }) {
+  const tiles = [];
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      tiles.push({
+        index: tiles.length, px: column * width / columns, py: row * height / rows,
+        width: width / columns, height: height / rows,
+        token: null, state: "pending", node: null, readyAt: 0, faults: 0, pulseUntil: 0,
+      });
+    }
+  }
+  return tiles;
+}
+
 export class Scheduler {
   constructor(config, hooks) {
     this.config = config;
@@ -26,17 +40,7 @@ export class Scheduler {
     // The default is five. Tune only after checking discovery progress in the booth browser.
     this.limit = config.render_limit;
     this.palette = config.default_palette;
-    this.tiles = [];
-    const { width, height, columns, rows } = config.geometry;
-    for (let row = 0; row < rows; row++) {
-      for (let column = 0; column < columns; column++) {
-        this.tiles.push({
-          index: this.tiles.length, px: column * width / columns, py: row * height / rows,
-          width: width / columns, height: height / rows,
-          token: null, state: "pending", node: null, readyAt: 0, faults: 0, pulseUntil: 0,
-        });
-      }
-    }
+    this.tiles = makeTiles(config.geometry);
     this.active = new Map();
     this.workers = new Map();
     this.cooldowns = new Map();
@@ -70,6 +74,30 @@ export class Scheduler {
     this.interval = setInterval(() => this.tick(), Math.min(100, this.timing.poll_interval_ms));
   }
 
+  applySettings(config) {
+    // The caller validates first. Install both grids before restart can dispatch or
+    // invoke change hooks. Old jobs keep their old tile objects and request credits.
+    const gridChanged = Object.keys(config.geometry).some(key =>
+      config.geometry[key] !== this.config.geometry[key]);
+    const viewChanged = Object.keys(config.view).some(key =>
+      config.view[key] !== this.config.view[key]);
+    const timingChanged = Object.keys(config.timing).some(key =>
+      config.timing[key] !== this.timing[key]);
+    if (!gridChanged && !viewChanged && !timingChanged) return;
+    const tiles = gridChanged ? makeTiles(config.geometry) : this.tiles;
+    if (gridChanged) this.hooks.grid(config.geometry);
+    this.config = config;
+    this.timing = config.timing;
+    this.tiles = tiles;
+    if (gridChanged || viewChanged) {
+      this.tileCursor = 0;
+      this.restart();
+    } else {
+      // Existing LOST deadlines remain unchanged; dwell uses the current duration.
+      this.tick();
+    }
+  }
+
   restart(palette = this.palette) {
     this.palette = palette;
     this.frame++;
@@ -77,7 +105,7 @@ export class Scheduler {
     this.completed = 0;
     this.completedAt = null;
     this.completedRAFFrame = null;
-    // The tile array is fixed. Superseding tokens does NOT release request credits.
+    // Superseding tokens does NOT release request credits or decoder barriers.
     for (const tile of this.tiles) {
       Object.assign(tile, { token: null, state: "pending", node: null, readyAt: 0, faults: 0, pulseUntil: 0 });
     }
@@ -357,7 +385,7 @@ export class Scheduler {
       this.cooldowns.set(job.worker.process_id, clock() + this.timing.cooldown_ms);
       this.refresh("Worker registration changed. Refreshing discovery…");
     } else if (response.status === 422 && code === "invalid_request") {
-      this.pause(`Render request rejected: ${body.message.slice(0, 240)}. Check gateway settings and reload this page.`);
+      this.pause(`Render request rejected: ${body.message.slice(0, 240)}. Check Settings or use Reset settings, then press RENDER.`);
     } else if ((response.status === 502 && code === "upstream_failure") ||
                (response.status === 504 && code === "upstream_timeout")) {
       this.invalidate(job, true);

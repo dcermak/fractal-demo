@@ -16,10 +16,10 @@ body {
   background-image: linear-gradient(#e6ebf280 1px, transparent 1px), linear-gradient(90deg, #e6ebf280 1px, transparent 1px);
   background-size: 28px 28px;
 }
-button, select { font: inherit; }
+button, select, input { font: inherit; }
 button, select:not(:disabled) { cursor: pointer; }
-button:focus-visible, select:focus-visible { outline: 3px solid #087cac; outline-offset: 3px; }
-button:disabled, select:disabled { cursor: wait; opacity: .6; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #087cac; outline-offset: 3px; }
+button:disabled, select:disabled { cursor: not-allowed; opacity: .6; }
 .dashboard { max-width: 1400px; padding: 22px; margin: 0 auto; }
 .page-header, .heading, .toolbar, .toolbar label, .pool-header, .render-caption { display: flex; align-items: center; }
 .page-header { justify-content: space-between; gap: 16px; margin-bottom: 20px; }
@@ -45,6 +45,37 @@ h1 { margin: 0; font-size: clamp(19px, 2.5vw, 26px); letter-spacing: -.035em; }
 .formula { font-size: 13px; font-weight: 700; }
 .formula span { margin-left: 8px; color: var(--muted); font: 12px var(--mono); }
 .toolbar label { gap: 9px; color: var(--muted); font-size: 12px; }
+.zoom-controls, .settings-actions { display: flex; gap: 6px; }
+.icon-button, .settings-actions button {
+  min-height: 38px; padding: 7px 12px; background: white; color: #152337;
+  border: 1px solid #bcc9d8; border-radius: 6px; font-size: 13px;
+}
+.icon-button { width: 40px; padding: 7px; }
+.icon-button svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.icon-button:hover:not(:disabled), .settings-actions button:hover:not(:disabled) { background: #eaf5fa; }
+.pan-button {
+  position: absolute; z-index: 1;
+  width: 38px; height: 48px; padding: 0; border: 1px solid #b6d6e5;
+  border-radius: 6px; background: #091526d9; color: white; font-size: 24px;
+}
+#pan-left, #pan-right { top: 50%; transform: translateY(-50%); }
+#pan-left { left: 8px; }
+#pan-right { right: 8px; }
+#pan-up, #pan-down { left: 50%; transform: translateX(-50%); width: 48px; height: 38px; }
+#pan-up { top: 8px; }
+#pan-down { bottom: 8px; }
+.pan-button:hover:not(:disabled) { background: #087ba5; }
+.settings-panel { border-top: 1px solid var(--line); padding: 10px 14px; }
+.settings-panel summary { cursor: pointer; width: fit-content; font-size: 13px; font-weight: 600; }
+.settings-panel fieldset { border: 0; padding: 0; margin: 12px 0 0; min-width: 0; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 10px; }
+.settings-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+.settings-grid input { min-width: 0; width: 100%; padding: 7px; border: 1px solid #bcc9d8; border-radius: 5px; color: #152337; background: white; }
+.settings-help { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+.settings-actions { margin-top: 10px; }
+.settings-error, .storage-notice { font-size: 12px; color: #a02c36; margin: 10px 0 0; }
+.storage-notice { padding: 0 14px 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 select { min-height: 38px; max-width: 220px; padding: 6px 28px 6px 10px; background: white; color: #152337; border: 1px solid #bcc9d8; border-radius: 6px; font-size: 13px; }
 /* Both layers fill the same aspect-ratio box; no independent object-fit scaling. */
 .viewport { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #090f20; isolation: isolate; }

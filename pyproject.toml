@@ -14,7 +14,7 @@ fractal-gateway = "fractal_demo.gateway:main"
 fractal-worker = "fractal_demo.worker:main"
 
 [dependency-groups]
-dev = ["pytest>=9,<10", "ruff>=0.14", "hatchling>=1.27"]
+dev = ["pytest>=9,<10", "ruff>=0.14", "hatchling>=1.27", "playwright>=1.56,<2", "pyyaml>=6,<7"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fractal_demo"]

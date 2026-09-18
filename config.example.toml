@@ -31,7 +31,7 @@ ymin = 0.08
 pixel_size = 0.00025
 iterations = 800
 
-# Candidates: tune with healthy render times and visible booth behavior.
+# Browser timings in milliseconds. Adjust for the demo workload and display.
 [timing]
 poll_interval_ms = 500
 poll_timeout_ms = 2000

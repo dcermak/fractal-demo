@@ -13,7 +13,6 @@
     <main class="dashboard">
       <header class="page-header">
         <div class="heading">
-          <span class="brand-mark" aria-hidden="true"></span>
           <div>
             <h1>Distributed Renderer</h1>
             <p>Mandelbrot · Computed across worker nodes</p>
@@ -32,6 +31,14 @@
       <section class="render-panel" aria-label="Mandelbrot image">
         <div class="toolbar">
           <div class="formula">Mandelbrot <span>z → z² + c</span></div>
+          <div class="zoom-controls" role="group" aria-label="Zoom">
+            <button id="zoom-in" class="icon-button" type="button" disabled aria-label="Zoom in" title="Zoom in 2×">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M6 10h8M10 6v8"/></svg>
+            </button>
+            <button id="zoom-out" class="icon-button" type="button" disabled aria-label="Zoom out" title="Zoom out 2×">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M6 10h8"/></svg>
+            </button>
+          </div>
           <label for="palette-select">Palette
             <select id="palette-select" disabled aria-label="Image palette"></select>
           </label>
@@ -40,9 +47,36 @@
           <canvas id="fractal-canvas" width="960" height="540" role="img" aria-label="Mandelbrot image, rendered tile by tile. Tile border colors identify the producing nodes."></canvas>
           <div id="tile-overlay" class="tile-overlay" aria-hidden="true"></div>
           <div id="empty-hint" class="empty-hint">Connecting to the gateway…</div>
+          <button id="pan-left" class="pan-button" type="button" disabled aria-label="Pan left" title="Pan left by a quarter of the view">←</button>
+          <button id="pan-right" class="pan-button" type="button" disabled aria-label="Pan right" title="Pan right by a quarter of the view">→</button>
+          <button id="pan-up" class="pan-button" type="button" disabled aria-label="Pan up" title="Pan up by a quarter of the view">↑</button>
+          <button id="pan-down" class="pan-button" type="button" disabled aria-label="Pan down" title="Pan down by a quarter of the view">↓</button>
         </div>
         <progress id="render-progress" value="0" max="1" aria-label="Painted tiles"></progress>
         <div class="render-caption"><span id="geometry-text">Loading configuration…</span><span id="frame-text">Frame 1</span></div>
+        <details class="settings-panel">
+          <summary>Settings</summary>
+          <form id="settings-form" novalidate>
+            <fieldset id="settings-fields" disabled>
+              <legend class="sr-only">Render settings</legend>
+              <div class="settings-grid">
+                <label>Columns <input id="setting-columns" type="number" min="1" max="8192" step="1" required></label>
+                <label>Rows <input id="setting-rows" type="number" min="1" max="8192" step="1" required></label>
+                <label>Iterations <input id="setting-iterations" type="number" min="1" max="10000" step="1" required></label>
+                <label>Frame dwell (ms) <input id="setting-dwell_ms" type="number" min="1" max="300000" step="1" required></label>
+                <label>LOST display (ms) <input id="setting-lost_ms" type="number" min="1" max="300000" step="1" required></label>
+              </div>
+              <p id="grid-preview" class="settings-help"></p>
+              <div class="settings-actions">
+                <button type="submit">Apply</button>
+                <button id="reset-settings" type="button">Reset settings</button>
+              </div>
+            </fieldset>
+            <p id="settings-error" class="settings-error" role="alert" hidden></p>
+            <p class="settings-help">Changes are remembered in this browser. Reset restores the configured view and settings.</p>
+          </form>
+        </details>
+        <p id="storage-notice" class="storage-notice" role="status" hidden></p>
       </section>
 
       <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true" data-tone="waiting">
@@ -54,7 +88,6 @@
         <ul id="worker-legend" class="worker-legend"></ul>
         <p id="pool-empty" class="pool-empty">Waiting for worker discovery.</p>
       </section>
-      <footer>Completed tiles stay visible when workers lose contact. Each new frame computes the same view again.</footer>
       <noscript><p class="noscript">Enable JavaScript to run the renderer.</p></noscript>
     </main>
   </body>
