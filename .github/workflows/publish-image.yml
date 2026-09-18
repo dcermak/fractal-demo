@@ -11,20 +11,20 @@ permissions:
 
 concurrency:
   group: worker-image-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: "0.12.3"
-          python-version: "3.14"
+      - name: Install uv
+        run: |
+          PIPX_BIN_DIR="$HOME/.local/bin" pipx install uv
+          printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install frozen development dependencies
         run: uv sync --frozen
-      - name: Check Python code and build-context filters
+      - name: Check Python code
         run: uv run --frozen ruff check src tests scripts
       - name: Run Python integration and numerical tests
         run: uv run --frozen pytest
