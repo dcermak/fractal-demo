@@ -24,8 +24,6 @@ jobs:
           printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install frozen development dependencies
         run: uv sync --frozen
-      - name: Check Python code
-        run: uv run --frozen ruff check src tests scripts
       - name: Run Python integration and numerical tests
         run: uv run --frozen pytest
 

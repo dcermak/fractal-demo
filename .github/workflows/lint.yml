@@ -1,0 +1,25 @@
+---
+name: Lint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: |
+          PIPX_BIN_DIR="$HOME/.local/bin" pipx install uv
+          printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install frozen development dependencies
+        run: uv sync --frozen
+      - name: Check Python imports and style
+        run: uv run --frozen ruff check src tests scripts
+      - name: Check Python formatting
+        run: uv run --frozen ruff format --check src tests scripts
