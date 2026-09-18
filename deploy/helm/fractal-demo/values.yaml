@@ -1,0 +1,8 @@
+image: ghcr.io/dcermak/fractal-demo:latest
+# HTTP origin reachable from worker pods. Generate this from the host TOML and libvirt.
+gatewayUrl: ""
+worker:
+  # Shared by the worker listener, container port, and host port.
+  port: 8080
+# Existing secrets in the release namespace, e.g. [{name: ghcr-pull}].
+imagePullSecrets: []

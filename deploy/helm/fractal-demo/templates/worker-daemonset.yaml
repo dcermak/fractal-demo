@@ -1,9 +1,9 @@
-# Copy to worker-daemonset.local.yaml and replace both REPLACE values before applying.
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: fractal-worker
-  namespace: fractal-demo
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
@@ -19,7 +19,7 @@ spec:
         app.kubernetes.io/name: fractal-worker
     spec:
       automountServiceAccountToken: false
-      # Provisional: measure admitted-work drain under the selected CPU limit.
+      # Allow admitted work to drain; validate with the deployed CPU limit and workload.
       terminationGracePeriodSeconds: 30
       affinity:
         nodeAffinity:
@@ -36,13 +36,14 @@ spec:
                     operator: DoesNotExist
                   - key: node-role.kubernetes.io/master
                     operator: DoesNotExist
-      # If the GHCR package is private, create this secret separately and uncomment:
-      # imagePullSecrets:
-      #   - name: ghcr-pull
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: worker
-          image: ghcr.io/REPLACE_OWNER/REPLACE_REPOSITORY@sha256:REPLACE_DIGEST
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: Always
           env:
             - name: NODE_NAME
               valueFrom:
@@ -53,19 +54,19 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
             - name: GATEWAY_URL
-              value: http://REPLACE_WITH_DEMO_PC_IP:8081
+              value: {{ required "Set gatewayUrl or generate values with scripts/deployment_values.py" .Values.gatewayUrl | quote }}
             - name: WORKER_PORT
-              value: "8080"
+              value: {{ .Values.worker.port | quote }}
             - name: REGISTRATION_INTERVAL
               value: "0.5"
             - name: REGISTRATION_TIMEOUT
               value: "2"
           ports:
             - name: http
-              containerPort: 8080
-              hostPort: 8080
+              containerPort: {{ .Values.worker.port }}
+              hostPort: {{ .Values.worker.port }}
               protocol: TCP
-          # Candidates, to be measured on the booth PC with the selected workload.
+          # Validate these limits on the demo hardware with the intended workload.
           resources:
             requests:
               cpu: "1"

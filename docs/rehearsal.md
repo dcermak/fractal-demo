@@ -1,114 +1,53 @@
-# Booth rehearsal record
+# Pre-demo checklist
 
-## Current evidence
+Use the intended kiosk hardware, browser, pane dimensions, and deployment configuration.
+Keep the working image digest and local configuration available for [restoration](deployment.md#restoring-and-rolling-back).
+Record failures with the settings and steps needed to reproduce them.
 
-On 2026-09-15, the operator confirmed that local testing works after correcting the worker port mappings.
-The reported setup uses the gateway on 8081 and two workers on 8082 and 8083. Detailed visual checks,
-container execution, cluster deployment, and failure timing measurements remain unrecorded.
+## Startup and controls
 
-This file is a record template. Replace pending values with observed results and retain failed trials.
-Deployment and restoration commands are in [deployment.md](deployment.md).
+- [ ] Start the gateway with zero workers. The page stays responsive and waits for workers.
+- [ ] Add workers. Each registered worker contributes tiles with matching node labels and borders.
+- [ ] Check readability, tile alignment, controls, and colors in the intended split pane.
+- [ ] Pan, zoom, change the palette, and apply grid and iteration changes during rendering.
+      Each new frame uses the accepted settings, with no tiles from an earlier frame.
+- [ ] Reload and reset settings. Saved values survive reload; reset restores the configured defaults.
+- [ ] Adjust dwell and LOST duration. Check repeated frames and visible failure markers.
+- [ ] Hide and restore the page. Discovery refreshes and rendering resumes.
+- [ ] Run the checks in Firefox and Chromium.
 
-## Environment
+## Failure and recovery
 
-| Item | Recorded value |
-| --- | --- |
-| Date and operator | Pending |
-| Source commit | Pending |
-| Demo-PC OS, CPU, and memory | Pending |
-| Guest OS and k3s version | Pending |
-| Worker architecture | Pending; prepared image and manifest target amd64 |
-| Kubeconfig location and context | Pending; record the location, not credentials |
-| Browser versions | Pending |
-| Screen resolution, scaling, and split-pane dimensions | Pending |
-| Gateway bind addresses and port | Pending |
-| Worker registration origin | Pending |
-| Allowed node networks and advertised node IPs | Pending |
-| Worker image digest | Pending |
-| Previous working image digest | None recorded |
-| Registry visibility and cluster pull access | Pending |
-| Control-plane and eligible worker counts | Pending |
-| Gateway configuration and local manifest locations | Pending |
+Select explicit targets in the disposable demo cluster before removing nodes.
+Keep the host gateway running and the renderer visible during node-loss checks.
 
-## Workload and timing settings
+### Demonstrating worker loss
 
-Record the values used for each trial. The candidates below are not measurements.
+1. Start at least two eligible workers and confirm that both contribute tiles.
+2. Match one worker's node label in the compute pool to its disposable VM in the VM manager.
+   Select a worker VM, not the gateway, VM-management host, or a control-plane node.
+3. Keep the renderer visible beside the VM manager in separate windows or a split pane.
+   Switching to another tab pauses rendering and invalidates unfinished assignments, which can hide the intended LOST moment.
+4. Use the rehearsed view, iteration count, and LOST display duration. Wait for an active tile assigned to the selected worker.
+   Tune these settings beforehand so unfinished work and failure markers are visible without healthy renders timing out.
+5. Abruptly stop the selected worker VM using the VM manager's power-off or kill operation.
+   Graceful Ctrl+C shutdown or draining can let admitted work finish instead.
+6. Observe LOST tiles retrying on surviving workers while completed pixels remain visible.
+   If the assignment finished before the stop, a LOST marker is not guaranteed. Repeat with another unfinished assignment after recovery.
+7. Restore or replace the worker using the VM manager's procedure, then verify registration and new tile contribution.
+   A kill operation may delete the VM or its disks. The returning worker's name, process identity, and color may differ.
+   Confirm contribution before starting another failure demonstration.
 
-| Setting | Initial candidate | Selected value |
-| --- | --- | --- |
-| Raster and grid | 960 × 540, 16 × 9 | Pending |
-| Tile dimensions | 60 × 60 | Pending |
-| View | xmin=-0.9, ymin=0.08, pixel_size=0.00025 | Pending |
-| Iterations and palette | 800, cyber | Pending |
-| Compute slots per worker | One | Pending |
-| CPU request / limit | 1 / 1 core | Pending |
-| Memory request / limit | 128 / 256 MiB | Pending |
-| Registration interval / deadline | 500 ms / 2 s | Pending |
-| Registration expiry | 1.5 s | Pending |
-| Roster poll interval / deadline | 500 ms / 2 s | Pending |
-| Proxy connection / total deadline | 1 s / 10 s | Pending |
-| Browser render deadline | 12 s | Pending |
-| Worker and shared retry cooldown | 350 ms | Pending |
-| Proxy / browser render limit | 5 / 5 | Pending |
-| LOST display | 600 ms | Pending |
-| Completed-frame dwell | 1,500 ms | Pending |
-| Rolling rate window | 5 s | Pending |
-| Termination grace | 30 s | Pending |
+### Checking recovery scenarios
 
-Record healthy tile times, control-request progress, memory use, and shutdown drain under CPU contention.
-Include a 256 × 256 tile at the 10,000-iteration ceiling when measuring maximum admitted work.
-Select deadlines that allow healthy computation and delivery of structured proxy errors before browser
-timeouts. Check probe responsiveness under the selected resource limits.
+- [ ] Remove a worker during unfinished work. LOST tiles retry on survivors; completed pixels remain visible.
+- [ ] Remove all workers, then restore one. Pending work resumes without restarting the browser.
+- [ ] Remove a control-plane node. Check whether the deployment's surviving worker networking continues.
+- [ ] Stop and restart the host gateway. The page reports unavailable discovery and recovers after restart.
+- [ ] Reconstruct the cluster and follow the [restoration procedure](deployment.md#restoring-and-rolling-back).
+      Reapplied workers register and complete the retained frame.
+- [ ] Restore the previous image and matching configuration. Verify registration and rendering.
+- [ ] Confirm healthy renders, responsive probes, and orderly shutdown under the deployed CPU and memory limits.
 
-## Joint checks
-
-- [ ] Start the host gateway and browser with zero cluster workers.
-- [ ] Verify both network directions and availability of node host port 8080.
-- [ ] Deploy eligible nodes and verify registry pulls, registration, and attributed rendering.
-- [ ] Verify exclusion of both control-plane label forms.
-- [ ] Inspect seams, borders, legend labels, controls, and dwell in the intended split pane.
-- [ ] Exercise RENDER, palette changes, worker replacement, and repeated render cycles.
-- [ ] Hide and restore the page, then check discovery refresh and failure presentation.
-- [ ] Complete a Chromium smoke check in addition to Firefox.
-- [ ] Destroy an approved worker during unfinished computation and observe retry on survivors.
-- [ ] Destroy approved control-plane nodes and record whether surviving worker networking continues.
-- [ ] Remove every cluster node and confirm that the host page stays responsive and retains its image.
-- [ ] Restore the cluster and workload, then finish pending tiles without restarting the host page.
-- [ ] Exercise the recorded restoration and known-good image rollback procedures.
-- [ ] Compare worker counts using the same view, workload, dwell, and resource settings.
-
-Record the active context and explicit node targets before destructive trials. Node-management commands
-remain operator-owned. Restore injected network faults even when a trial fails.
-
-## Failure trials
-
-Use one observer timeline, such as a video recording with a visible action marker. Record elapsed times
-from that marker. Do not subtract monotonic timestamps from different processes or machines.
-
-| Trial | Target and action | Workers before / after | Contact-loss indication | LOST onset | First retry | Recovery | Result and recording |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Pending | Pending | Pending | Unmeasured | Unmeasured | Unmeasured | Unmeasured | Pending |
-
-The provisional target is 2.5 s from hard worker loss to the first visible contact-loss indication.
-Measure LOST onset separately. Record missed targets and unsuccessful restoration attempts alongside
-successful trials. Heartbeat age alone does not establish kill-to-visible latency.
-
-## Worker-count comparison
-
-| Trial | Eligible workers | Settings record | Frame computation time | Painted tiles / s | Host contention and observations |
-| --- | --- | --- | --- | --- | --- |
-| Pending | Pending | Pending | Unmeasured | Unmeasured | Pending |
-
-Report the measured useful range. All VMs share the demo PC's physical resources, and the browser's
-single-origin connection limit can restrict parallelism. Keep individual observations with the results.
-
-## Restart and restoration notes
-
-Record the commands and edited configuration used for successful startup and restoration. Keep the
-previous working image digest and configuration together. Store registry credentials separately.
-
-- Host gateway startup: pending.
-- Cluster workload reapplication: pending.
-- Known-good rollback: pending.
-- Required network restoration: pending.
-- Unresolved findings and next actions: pending.
+If a check fails, inspect the gateway and worker logs using the [troubleshooting guide](deployment.md#troubleshooting).
+Restore any injected network faults. Repeat the failed check after correcting the cause.

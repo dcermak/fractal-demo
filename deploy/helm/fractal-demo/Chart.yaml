@@ -1,0 +1,5 @@
+apiVersion: v2
+name: fractal-demo
+description: Workers for the distributed Mandelbrot demo
+type: application
+version: 0.1.0

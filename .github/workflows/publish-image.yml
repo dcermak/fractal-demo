@@ -26,6 +26,10 @@ jobs:
         run: uv sync --frozen
       - name: Run Python integration and numerical tests
         run: uv run --frozen pytest
+      - name: Check generated Helm manifests
+        run: |
+          helm version --short
+          uv run --frozen python -m pytest tests/deploy/chart.py
 
   image:
     needs: test

@@ -6,6 +6,6 @@ dist/
 *.egg-info/
 config.toml
 config.booth.toml
-deploy/*.local.yaml
+deploy/*.local.json
 *.log
 /.mypy_cache/

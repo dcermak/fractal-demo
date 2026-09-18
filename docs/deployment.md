@@ -1,19 +1,15 @@
-# Container and Kubernetes deployment
+# Deployment
 
-## Preparation status
-
-The Containerfile, GitHub Actions workflow, and Kubernetes manifests are prepared. Container builds,
-publication, and deployment have not run in this session. The operator runs these steps.
-
-The image uses `registry.opensuse.org/opensuse/bci/python:3.14`. The workflow builds `linux/amd64`, and
-the DaemonSet selects matching Linux nodes. Confirm the booth worker architecture before deploying.
+Run the gateway on the demo PC and one worker per eligible Kubernetes node.
+The image uses `registry.opensuse.org/opensuse/bci/python:3.14`.
+The publication workflow and DaemonSet target Linux amd64 workers.
 
 ## Building locally
 
-Choose Podman or Docker on the build machine. Run these commands from the repository root:
+Use Podman or Docker. Run these commands from the repository root:
 
 ```sh
-# Set ENGINE=docker if using Docker.
+# Set ENGINE=docker to use Docker.
 ENGINE=podman
 "$ENGINE" build -f Containerfile -t fractal-worker:local .
 "$ENGINE" run --rm fractal-worker:local --help
@@ -21,67 +17,60 @@ ENGINE=podman
   fractal-worker:local - < scripts/smoke_image.py
 ```
 
-The smoke check starts the installed gateway and worker inside the container. It checks registration,
-identity, decoded pixels, packaged assets, and orderly shutdown. It also checks that development
-packages are absent. It uses container loopback and needs no published ports or cluster access.
+The build installs the distribution's uv package and uses frozen runtime dependencies.
+The runtime image contains the installed virtual environment and runs `fractal-worker` as user and group ID 10001.
+[.dockerignore](../.dockerignore) restricts the build context to the required files.
 
-The build stage uses uv 0.12.3 with frozen runtime dependencies. The runtime stage contains the installed
-virtual environment and BCI base. It runs as UID/GID 10001 and starts `fractal-worker` directly.
-The `.containerignore` and `.dockerignore` files contain matching build-context filters.
+The smoke check starts a gateway and worker inside the container. It verifies registration, pixels,
+worker identity, packaged assets, shutdown, and exclusion of development packages. No published ports are needed.
 
-If a build or smoke check fails, retain the command output for diagnosis. Do not change host security
-settings or sandbox permissions to work around the failure.
+## Publishing images
 
-## Publishing through GitHub Actions
+[Lint and format checks](../.github/workflows/lint.yml) and
+[Python tests and Helm rendering checks](../.github/workflows/publish-image.yml) run on pushes and pull requests.
+On the default branch, successful tests in the publish-image workflow allow image building, smoke testing,
+and publication to GitHub Container Registry (GHCR).
+The lint and format workflow runs separately and does not gate publication.
+Manual workflow dispatch also publishes from the default branch.
 
-Push the prepared files to the intended GitHub repository. The workflow derives the image repository
-from its lowercase owner and repository name:
+The workflow derives the image name from the lowercase repository owner and name:
 
 ```text
 ghcr.io/<owner>/<repository>:sha-<full-commit-sha>
+ghcr.io/<owner>/<repository>:latest
 ```
 
-The workflow runs Python checks on pushes and pull requests. On the default branch, successful checks
-allow image building, smoke testing, and publication. Manual workflow dispatch also publishes when
-run on the default branch.
-
-The publication job uses `GITHUB_TOKEN` with `packages: write`. It adds source and revision labels to
-associate the image with the repository. No registry password is stored in the repository.
-
-After smoke testing, the workflow tags and pushes the same local image. The job summary and
-`worker-image-reference` artifact contain the resulting immutable reference:
+Publication uses `GITHUB_TOKEN` with `packages: write` permission. The job summary and
+`worker-image-reference` artifact contain the immutable reference:
 
 ```text
 ghcr.io/<owner>/<repository>@sha256:<digest>
 ```
 
-Use that digest in the DaemonSet. The commit tag helps locate builds, but deployment uses the digest.
-Keep the previous working digest and edited configuration before replacing an image.
+The Helm chart defaults to `ghcr.io/dcermak/fractal-demo:latest`. Override `image` when publishing from another repository or deploying a digest.
+Retain a working digest and its configuration for reproducible rollback.
+For anonymous pulls, make the GHCR package public. Private images require an image-pull secret.
+New cluster nodes need registry access to pull images.
 
-GitHub Container Registry package visibility is a separate setting. For anonymous cluster pulls, make
-the package public. For a private package, supply image-pull credentials in the demo namespace and
-enable `imagePullSecrets` in the local manifest. Successful publication does not verify cluster pull
-access. New nodes need registry access to pull the image.
+## Configuring the gateway
 
-## Configuring the host gateway
+Confirm both network directions:
 
-Choose a demo-PC interface reachable from the worker VMs. Confirm both network directions:
+- Worker pods must reach the demo PC's gateway address.
+- The demo PC must reach each advertised node IP on the configured `worker_port`.
 
-- Worker pods reach the demo-PC registration endpoint.
-- The demo PC reaches each advertised node IP on host port 8080.
+The cluster must support host-port mapping. Host access to pod addresses is unnecessary.
+Registration and rendering are unauthenticated. Restrict gateway and worker ports to the trusted demo network.
 
-Host access to pod networks is not required. The cluster must support the DaemonSet's host-port mapping.
-Keep registration on the trusted demo network, separate from the shared conference network.
-
-Create a separate gateway configuration:
+Create a local configuration, preserving an existing file:
 
 ```sh
-cp config.example.toml config.booth.toml
+cp -n config.example.toml config.booth.toml
 $EDITOR config.booth.toml
 ```
 
-Replace the following placeholders with the actual addresses. Port 8081 matches the successful local
-setup and remains a candidate for the booth. Match it in the worker manifest if you change it.
+Set explicit demo-PC interfaces and the node network. This deployment example uses gateway port 8081;
+the local-development example uses 8080. Replace the address placeholders:
 
 ```toml
 bind = ["127.0.0.1", "REPLACE_WITH_DEMO_PC_IP"]
@@ -90,45 +79,85 @@ node_networks = ["REPLACE_WITH_NODE_CIDR"]
 worker_port = 8080
 ```
 
-Remove the `[local_worker_ports]` table and its entries. Those development overrides take precedence
-over `worker_port`. Leave the geometry, view, and timing sections for workload tuning during rehearsal.
-
-Start the gateway on the demo PC before deploying workers:
+Remove the entire `[local_worker_ports]` table. Keep the geometry, view, and timing sections.
+Start the gateway before deploying workers:
 
 ```sh
 uv sync --frozen --no-dev
 "$PWD/.venv/bin/fractal-gateway" --config "$PWD/config.booth.toml"
 ```
 
-Use a second terminal for subsequent commands. Open `http://127.0.0.1:8081/` in the browser. With no
-workers, the page waits. Keep one active rendering browser window.
+Open **http://127.0.0.1:8081/** in one active browser window. Use another terminal for deployment commands.
 
-## Preparing the DaemonSet
+## Deploying workers
 
-Copy the manifest before editing deployment-specific values:
+Install Helm 3 or newer.
+
+### Generating worker values
+
+Generate values from the same TOML file used by the running gateway.
+
+The helper runs `virsh --connect qemu:///system net-dumpxml default` to discover the network's IPv4 host address.
+It reads both ports from TOML and checks the discovered address against `bind` and the subnet against `node_networks`.
+The subnet must overlap the allowed node networks; verify that those networks cover every worker address.
+Nonempty `local_worker_ports` are rejected. Local values and `config.booth.toml` are ignored by Git.
+
+Use `--libvirt-uri URI` and `--network NAME` to select another libvirt network.
+Use `--gateway-url http://ADDRESS:PORT` to bypass discovery. The origin must use plain HTTP.
+Its address and port must match the host TOML.
+Use `--image ghcr.io/OWNER/REPOSITORY@sha256:DIGEST` to pin an image.
+These options also accept shell command substitutions.
+
+Add your selected options to the helper invocation below, before `> "$candidate"`.
+The block writes a temporary candidate and replaces the saved values only after successful generation.
+It runs in a subshell so failure does not close your terminal:
 
 ```sh
-cp deploy/worker-daemonset.yaml deploy/worker-daemonset.local.yaml
-$EDITOR deploy/worker-daemonset.local.yaml
+(
+  candidate=$(mktemp deploy/values.XXXXXX.local.json) || exit 1
+  if uv run --frozen --no-dev python scripts/deployment_values.py \
+      --config config.booth.toml > "$candidate" &&
+      mv -- "$candidate" deploy/values.local.json; then
+    echo "Saved deploy/values.local.json"
+  else
+    rm -f -- "$candidate"
+    echo "Could not save new values. Stop here; existing values were not replaced." >&2
+    exit 1
+  fi
+)
 ```
 
-Replace the image placeholder with the published digest. Replace `GATEWAY_URL` with the reachable
-demo-PC HTTP origin and gateway port. The local manifest and `config.booth.toml` are ignored by Git.
+If the block fails, stop and correct the error before continuing.
+An existing values file remains unchanged; it must not be mistaken for newly generated values.
+If no saved file existed, failure leaves none.
 
-The manifest runs one worker on each eligible node. Required affinity excludes nodes with either
-control-plane label, even when those nodes have no taints. It reads `spec.nodeName` and `status.hostIP`
-through the Downward API and does not mount a service-account token.
+### Previewing worker manifests
 
-The initial CPU request and limit are one core. Memory request and limit are 128 MiB and 256 MiB.
-Termination grace is 30 s. These are provisional settings, pending workload and drain measurements.
+For a private image, append `--set 'imagePullSecrets[0].name=ghcr-pull'` to both the preview and installation commands.
+Apply any other Helm overrides consistently to both commands too.
 
-Health probes check process responsiveness independently of computation and registration. A Ready
-pod does not establish successful registration or rendering. Verify both after deployment.
+Preview the manifest locally:
 
-## Deploying to the demo cluster
+```sh
+helm template fractal-demo deploy/helm/fractal-demo \
+  --namespace fractal-demo -f deploy/values.local.json
+```
 
-Select the operator-supplied kubeconfig and intended context. Run the following commands only against
-the disposable demo cluster:
+Stop if the preview fails. Check the rendered image reference, gateway URL, and worker port before installing.
+Keep the saved values and Helm overrides unchanged between preview and installation.
+
+The chart sets `WORKER_PORT`, `containerPort`, and `hostPort` from the same value.
+After changing either port in TOML, restart the gateway and repeat [values generation](#generating-worker-values), preview, and installation.
+Include the intended image reference and still-applicable options whenever you regenerate values.
+
+The DaemonSet excludes nodes labeled `node-role.kubernetes.io/control-plane` or `node-role.kubernetes.io/master`.
+The Downward API supplies node name and host IP. Workers do not mount a service-account token.
+
+Defaults request and limit CPU to one core, request 128 MiB of memory, and limit memory to 256 MiB.
+Termination grace is 30 s. Validate these settings with the intended workload under the deployed resource limits.
+Health probes check process responsiveness; readiness alone does not confirm registration or rendering.
+
+Select the disposable demo cluster:
 
 ```sh
 export KUBECONFIG=/absolute/path/to/demo-kubeconfig
@@ -138,52 +167,98 @@ kubectl --context "$CONTEXT" get nodes \
 kubectl --context "$CONTEXT" apply -f deploy/namespace.yaml
 ```
 
-For a private image, create the `ghcr-pull` image-pull secret in namespace `fractal-demo` using
-operator-managed credentials. Uncomment the corresponding `imagePullSecrets` section before applying
-the DaemonSet. Do not commit credentials.
+For a private image, create the `ghcr-pull` secret in namespace `fractal-demo` using your registry credentials.
+Use the same secret reference selected for the preview. Keep credentials outside the repository.
 
-Apply the edited manifest:
+
+### Installing or upgrading workers
+
+Install or upgrade using the saved values that passed the preview, with the same Helm overrides.
+This command reuses the file without running discovery or regenerating values:
 
 ```sh
-kubectl --context "$CONTEXT" apply -f deploy/worker-daemonset.local.yaml
-kubectl --context "$CONTEXT" -n fractal-demo rollout status daemonset/fractal-worker --timeout=120s
-kubectl --context "$CONTEXT" -n fractal-demo get pods -o wide
+helm upgrade --install fractal-demo deploy/helm/fractal-demo \
+  --kube-context "$CONTEXT" --namespace fractal-demo --create-namespace \
+  -f deploy/values.local.json
+```
+
+If Helm fails, stop and inspect the error before continuing. Preserving the values file does not roll back a failed upgrade.
+After successful installation, verify the rollout and registration. The checks stop at the first failure:
+
+```sh
+kubectl --context "$CONTEXT" -n fractal-demo rollout status daemonset/fractal-worker --timeout=120s &&
+kubectl --context "$CONTEXT" -n fractal-demo get pods -o wide &&
 kubectl --context "$CONTEXT" -n fractal-demo logs \
-  -l app.kubernetes.io/name=fractal-worker --prefix --tail=30
+  -l app.kubernetes.io/name=fractal-worker --prefix --tail=30 &&
 curl --fail http://127.0.0.1:8081/api/workers
 ```
 
-Confirm that eligible workers appear in the roster and contribute attributed tiles. Confirm that
-control-plane nodes have no render worker. Record the result in [rehearsal.md](rehearsal.md).
+Confirm that eligible nodes register and contribute tiles. Control-plane nodes should have no render worker.
+Use the [pre-demo checklist](rehearsal.md) before presenting.
+
+The image pull policy is `Always`, but publishing a new `latest` image does not restart existing pods.
+To refresh them:
+
+```sh
+kubectl --context "$CONTEXT" -n fractal-demo rollout restart daemonset/fractal-worker
+kubectl --context "$CONTEXT" -n fractal-demo rollout status daemonset/fractal-worker --timeout=120s
+```
+
+Only one deployment can use a given worker host port on the same nodes, even across namespaces.
+
+## Troubleshooting
+
+| Symptom | Checks |
+| --- | --- |
+| No workers in `/api/workers` | Check worker logs, `GATEWAY_URL`, gateway bind addresses, and allowed `node_networks`. Verify pod-to-host connectivity. |
+| Workers register but tiles fail | Check gateway logs and host-to-node connectivity on the configured `worker_port`. Inspect the browser status message. |
+| Local workers fail or requests reach the gateway itself | Match each `[local_worker_ports]` entry to the worker's `--port`. Restart the gateway after editing configuration. |
+| Pods stay Pending | Check node architecture, control-plane labels, available resources, and host-port conflicts with `kubectl describe pod`. |
+| `ImagePullBackOff` | Check the image digest, registry access, package visibility, and the namespace's image-pull secret. |
+| TOML changes appear ineffective | Restart the gateway, reload the page, and click **Reset settings** to clear browser overrides. |
+| Healthy work times out | Review the view, grid, iterations, and CPU contention. Allow the gateway deadline to expire before the browser render deadline. |
+
+For pod events:
+
+```sh
+kubectl --context "$CONTEXT" -n fractal-demo describe pod REPLACE_WITH_POD_NAME
+```
 
 ## Restoring and rolling back
 
-Full cluster reconstruction removes the workload definition and image-pull secrets. Keep the browser
-and host gateway running while the operator restores the cluster.
+Cluster reconstruction removes workload definitions and image-pull secrets. Keep the host gateway and browser running during reconstruction.
 
-1. Obtain current kubeconfig and select the restored demo context.
-2. Recheck node addressing against the gateway's allowed networks.
-3. Reapply this project's namespace and required image-pull credentials.
-4. Reapply the saved local DaemonSet manifest with its recorded digest.
-5. Verify registration and completion of the retained partial frame.
+1. Obtain the restored cluster's kubeconfig and select its context.
+2. Check node addresses against the gateway's allowed networks and verify connectivity in both directions.
+3. Reapply the namespace and required image-pull credentials.
+4. [Preview the saved values](#previewing-worker-manifests), then run the [install-only command](#installing-or-upgrading-workers) with the same overrides.
+5. Verify registration and completion of the retained frame.
 
-For rollback, restore the previous image digest in the local manifest and apply it again. Restore the
-matching gateway configuration if its settings changed. Verify registration and rendering afterward.
-On the first deployment, no previous working image exists. Remove the worker DaemonSet if that
-deployment needs to be withdrawn.
+Normal restoration reuses `deploy/values.local.json` without invoking the helper.
+Changed worker addresses alone do not require new Helm values if the gateway URL and configured ports remain unchanged.
+Update the allowed networks in TOML and restart the gateway if needed.
+
+If the advertised gateway URL or configured ports changed, update TOML and restart the gateway first.
+Repeat [values generation](#generating-worker-values) with the saved image reference and relevant options, then preview and install the new values.
+The JSON file stores the resolved URL, worker port, and optional image reference, not the original discovery arguments.
+
+For rollback, set `image` to the previous digest and upgrade the release with the saved worker settings.
+Rolling back Helm values containing `latest` does not restore a previous image.
+Restore the matching host gateway version and configuration when needed. Restart the gateway and reload the browser after gateway changes.
+A DaemonSet rollback does not restore the host gateway. Verify registration and rendering after either operation.
 
 ## Cleaning up
 
-Remove this application's workers:
+Remove the workers:
 
 ```sh
-kubectl --context "$CONTEXT" delete -f deploy/worker-daemonset.local.yaml
+helm uninstall fractal-demo --kube-context "$CONTEXT" --namespace fractal-demo
 ```
 
-To remove its namespace and image-pull secrets too:
+To also remove the namespace and its image-pull secrets:
 
 ```sh
 kubectl --context "$CONTEXT" delete -f deploy/namespace.yaml
 ```
 
-Stop the host gateway with Ctrl+C. VM and cluster management remain outside this application.
+Stop the host gateway with Ctrl+C.
