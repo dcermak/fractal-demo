@@ -104,8 +104,15 @@ def test_escape_on_last_iteration_is_colored_and_budget_independent(palette):
 )
 def test_adjacent_horizontal_and_vertical_tiles_match_whole(palette, xmin, ymin, step, px, py):
     whole = request(
-        xmin=xmin, ymin=ymin, pixel_size=step, px=px, py=py,
-        width=24, height=18, iterations=350, palette=palette,
+        xmin=xmin,
+        ymin=ymin,
+        pixel_size=step,
+        px=px,
+        py=py,
+        width=24,
+        height=18,
+        iterations=350,
+        palette=palette,
     )
     pixels = decode(whole)
     horizontal = np.concatenate(

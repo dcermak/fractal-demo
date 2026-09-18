@@ -24,16 +24,40 @@ def installed(tmp_path_factory):
     uv = shutil.which("uv")
     assert uv, "uv is required for installed-package verification"
     subprocess.run(
-        [uv, "build", "--wheel", "--offline", "--no-build-isolation", "--out-dir",
-         str(directory / "dist")],
-        cwd=ROOT, check=True, capture_output=True, text=True, timeout=60,
+        [
+            uv,
+            "build",
+            "--wheel",
+            "--offline",
+            "--no-build-isolation",
+            "--out-dir",
+            str(directory / "dist"),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
-    wheel, = (directory / "dist").glob("*.whl")
+    (wheel,) = (directory / "dist").glob("*.whl")
     target = directory / "package"
     subprocess.run(
-        [uv, "pip", "install", "--offline", "--no-deps", "--python", sys.executable,
-         "--target", str(target), str(wheel)],
-        check=True, capture_output=True, text=True, timeout=60,
+        [
+            uv,
+            "pip",
+            "install",
+            "--offline",
+            "--no-deps",
+            "--python",
+            sys.executable,
+            "--target",
+            str(target),
+            str(wheel),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     return directory, target
 
@@ -57,7 +81,7 @@ def wait_until(predicate, process, log, timeout=8):
             result = predicate()
             if result:
                 return result
-        except (URLError, TimeoutError):
+        except URLError, TimeoutError:
             pass
         time.sleep(0.04)
     pytest.fail(f"Process did not reach expected state: {log.read_text()}")
@@ -72,7 +96,10 @@ def launch(installed, role, args, log_name):
     with log.open("w") as output:
         process = subprocess.Popen(
             [sys.executable, str(target / "bin" / role), *args],
-            cwd=directory, env=env, stdout=output, stderr=subprocess.STDOUT,
+            cwd=directory,
+            env=env,
+            stdout=output,
+            stderr=subprocess.STDOUT,
         )
         try:
             yield process, log
@@ -92,32 +119,45 @@ def test_installed_entrypoints_assets_and_worker_restart(installed):
     # Confirm isolation rather than accidentally testing the editable checkout.
     check = subprocess.run(
         [sys.executable, "-c", "import fractal_demo; print(fractal_demo.__file__)"],
-        cwd=directory, env={**os.environ, "PYTHONPATH": str(target)},
-        check=True, capture_output=True, text=True, timeout=5,
+        cwd=directory,
+        env={**os.environ, "PYTHONPATH": str(target)},
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     assert str(target) in check.stdout
     gateway_port, worker_port = free_port(), free_port()
     while worker_port == gateway_port:
         worker_port = free_port()
     config = directory / "gateway.toml"
-    config.write_text(
-        f"port = {gateway_port}\nworker_port = {worker_port}\nexpiry_seconds = 0.4\n"
-    )
+    config.write_text(f"port = {gateway_port}\nworker_port = {worker_port}\nexpiry_seconds = 0.4\n")
     origin = f"http://127.0.0.1:{gateway_port}"
     with launch(installed, "fractal-gateway", ["--config", str(config)], "gateway.log") as gateway:
         gw, glog = gateway
         wait_until(lambda: request_json(origin + "/healthz"), gw, glog)
         assert request_json(origin + "/api/workers") == {"workers": []}
         for asset, marker in (
-            ("/", b"<!DOCTYPE html>"), ("/static/app.js", b"import"),
-            ("/static/scheduler.js", b"export"), ("/static/app.css", b"canvas"),
+            ("/", b"<!DOCTYPE html>"),
+            ("/static/app.js", b"import"),
+            ("/static/scheduler.js", b"export"),
+            ("/static/app.css", b"canvas"),
         ):
             with HTTP.open(origin + asset, timeout=1) as response:
                 assert marker.lower() in response.read().lower()
         worker_args = [
-            "--node", "installed-worker", "--host-ip", "127.0.0.1", "--bind", "127.0.0.1",
-            "--port", str(worker_port), "--gateway-url", origin,
-            "--registration-interval", "0.05",
+            "--node",
+            "installed-worker",
+            "--host-ip",
+            "127.0.0.1",
+            "--bind",
+            "127.0.0.1",
+            "--port",
+            str(worker_port),
+            "--gateway-url",
+            origin,
+            "--registration-interval",
+            "0.05",
         ]
         with launch(installed, "fractal-worker", worker_args, "worker-1.log") as (wk, wlog):
             roster = wait_until(lambda: request_json(origin + "/api/workers")["workers"], wk, wlog)
@@ -125,6 +165,7 @@ def test_installed_entrypoints_assets_and_worker_restart(installed):
             wk.terminate()
             assert wk.wait(timeout=10) == 0, wlog.read_text()
         with launch(installed, "fractal-worker", worker_args, "worker-2.log") as (wk, wlog):
+
             def replaced():
                 roster = request_json(origin + "/api/workers")["workers"]
                 return roster if roster and roster[0]["process_id"] != first_id else None

@@ -54,8 +54,12 @@ class WorkerSettings:
                 raise ProtocolError(f"{key} must be positive and finite")
         url = URL(self.gateway_url)
         if (
-            url.scheme != "http" or not url.host or url.user is not None
-            or url.query_string or url.fragment or url.path not in ("", "/")
+            url.scheme != "http"
+            or not url.host
+            or url.user is not None
+            or url.query_string
+            or url.fragment
+            or url.path not in ("", "/")
         ):
             raise ProtocolError("gateway_url must be an HTTP origin, such as http://192.0.2.1:8080")
 
@@ -102,11 +106,14 @@ class WorkerState:
         settings = self.settings
         url = str(URL(settings.gateway_url).with_path("/register"))
         payload = {
-            "node": settings.node, "process_id": self.process_id, "host_ip": settings.host_ip,
+            "node": settings.node,
+            "process_id": self.process_id,
+            "host_ip": settings.host_ip,
         }
         retry = settings.registration_interval
         async with ClientSession(
-            timeout=ClientTimeout(total=settings.registration_timeout), trust_env=False,
+            timeout=ClientTimeout(total=settings.registration_timeout),
+            trust_env=False,
         ) as session:
             while self.admitting:
                 try:
@@ -147,10 +154,14 @@ async def render(request: web.Request):
     except Exception:
         LOG.exception("Tile computation failed")
         return error_response(
-            500, "render_failed", "Tile computation failed; check worker log", "worker",
+            500,
+            "render_failed",
+            "Tile computation failed; check worker log",
+            "worker",
         )
     return web.Response(
-        body=png, content_type="image/png",
+        body=png,
+        content_type="image/png",
         headers={**NO_STORE, "X-Worker-ID": state.process_id, "X-Render-Node": state.settings.node},
     )
 
@@ -201,8 +212,13 @@ async def serve(settings: WorkerSettings):
         await runner.setup()
         await web.TCPSite(runner, settings.bind, settings.port).start()
         app[STATE].listener_ready.set()
-        LOG.info("Worker %s (%s) listening on %s:%s", settings.node, app[STATE].process_id,
-                 settings.bind, settings.port)
+        LOG.info(
+            "Worker %s (%s) listening on %s:%s",
+            settings.node,
+            app[STATE].process_id,
+            settings.bind,
+            settings.port,
+        )
         await stop.wait()
     finally:
         await runner.cleanup()
@@ -217,10 +233,12 @@ def main():
     parser.add_argument("--gateway-url", default=os.getenv("GATEWAY_URL"))
     parser.add_argument("--bind", default=os.getenv("WORKER_BIND", "0.0.0.0"))
     parser.add_argument("--port", type=int, default=os.getenv("WORKER_PORT", "8080"))
-    parser.add_argument("--registration-interval", type=float,
-                        default=os.getenv("REGISTRATION_INTERVAL", "0.5"))
-    parser.add_argument("--registration-timeout", type=float,
-                        default=os.getenv("REGISTRATION_TIMEOUT", "2"))
+    parser.add_argument(
+        "--registration-interval", type=float, default=os.getenv("REGISTRATION_INTERVAL", "0.5")
+    )
+    parser.add_argument(
+        "--registration-timeout", type=float, default=os.getenv("REGISTRATION_TIMEOUT", "2")
+    )
     args = parser.parse_args()
     if not all((args.node, args.host_ip, args.gateway_url)):
         parser.error(

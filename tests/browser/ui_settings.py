@@ -82,8 +82,10 @@ def configuration(**changes):
         "geometry": {"width": 96, "height": 64, "columns": 4, "rows": 4},
         "view": {"xmin": -2.0, "ymin": -1.0, "pixel_size": 0.035, "iterations": 80},
         "timing": {
-            **GatewaySettings().timing, "poll_interval_ms": 50,
-            "dwell_ms": 300000, "render_timeout_ms": 60000,
+            **GatewaySettings().timing,
+            "poll_interval_ms": 50,
+            "dwell_ms": 300000,
+            "render_timeout_ms": 60000,
         },
         "render_limit": 1,
     }
@@ -143,7 +145,8 @@ async def saved(page):
 async def finished(page, tiles=16):
     await page.wait_for_function(
         "n => { const p = document.getElementById('render-progress'); "
-        "return p.max === n && p.value === n; }", arg=tiles,
+        "return p.max === n && p.value === n; }",
+        arg=tiles,
     )
     await expect(page.locator('#tile-overlay .tile[data-state="done"]')).to_have_count(tiles)
     state = await page.evaluate("""() => ({
@@ -159,8 +162,9 @@ async def finished(page, tiles=16):
     assert len(sizes) == 1
     width, height = sizes.pop()
     assert state["width"] % width == state["height"] % height == 0
-    expected = {(x, y) for y in range(0, state["height"], height)
-                for x in range(0, state["width"], width)}
+    expected = {
+        (x, y) for y in range(0, state["height"], height) for x in range(0, state["width"], width)
+    }
     assert {(p["x"], p["y"]) for p in state["paints"]} == expected
     assert not any(p["held"] for p in state["paints"])
     return state
@@ -254,9 +258,14 @@ def test_invalid_apply_and_navigation_boundaries(tmp_path):
             frame = await page.evaluate("uiProbe.frame")
             image = await page.locator("canvas").evaluate("c => c.toDataURL()")
             for change in (
-                {"columns": 17}, {"rows": 0}, {"columns": 1, "rows": 1},
-                {"columns": 960, "rows": 540}, {"iterations": 10001},
-                {"iterations": 1.5}, {"dwell_ms": 0}, {"lost_ms": ""},
+                {"columns": 17},
+                {"rows": 0},
+                {"columns": 1, "rows": 1},
+                {"columns": 960, "rows": 540},
+                {"iterations": 10001},
+                {"iterations": 1.5},
+                {"dwell_ms": 0},
+                {"lost_ms": ""},
             ):
                 await fill(page, **{key: baseline[key] for key in INPUTS})
                 await apply(page, **change)
@@ -328,7 +337,11 @@ def test_persistence_reset_and_worker_return(tmp_path):
             reset = await finished(page)
             assert await saved(page) is None
             restored = {
-                "columns": 4, "rows": 4, "iterations": 80, "dwell_ms": 300000, "lost_ms": 600,
+                "columns": 4,
+                "rows": 4,
+                "iterations": 80,
+                "dwell_ms": 300000,
+                "lost_ms": 600,
             }
             for key, value in restored.items():
                 await expect(page.locator(f"#setting-{key}")).to_have_value(str(value))
@@ -348,13 +361,20 @@ def test_invalid_saved_data_and_changed_raster(tmp_path):
             await open_settings(stack, page)
             await apply(page, columns=8)
             accepted = await saved(page)
-            invalid = ["{", "null", "[]", json.dumps({**accepted, "iterations": "140"}),
-                       json.dumps({**accepted, "columns": True}),
-                       json.dumps({**accepted, "pixel_size": 1e-14}),
-                       json.dumps({**accepted, "xmin": 4}), json.dumps({"columns": 8})]
+            invalid = [
+                "{",
+                "null",
+                "[]",
+                json.dumps({**accepted, "iterations": "140"}),
+                json.dumps({**accepted, "columns": True}),
+                json.dumps({**accepted, "pixel_size": 1e-14}),
+                json.dumps({**accepted, "xmin": 4}),
+                json.dumps({"columns": 8}),
+            ]
             for record in invalid:
                 await page.evaluate(
-                    "([key, value]) => localStorage.setItem(key, value)", [STORAGE_KEY, record],
+                    "([key, value]) => localStorage.setItem(key, value)",
+                    [STORAGE_KEY, record],
                 )
                 await page.reload()
                 await expect(page.locator("#setting-columns")).to_have_value("4")
@@ -449,7 +469,8 @@ def test_old_work_keeps_credits_and_cannot_paint_after_grid_changes(tmp_path, ho
 def test_expired_decoder_barrier_survives_settings_changes(tmp_path):
     async def scenario():
         config = configuration(
-            connect_timeout=0.25, upstream_timeout=0.5,
+            connect_timeout=0.25,
+            upstream_timeout=0.5,
             timing={**configuration().timing, "render_timeout_ms": 1000},
         )
         async with local_page(tmp_path, settings=config, script="uiProbe.hold = 'decode';") as pair:
@@ -482,9 +503,14 @@ def test_lost_duration_change_applies_only_to_new_losses(tmp_path):
                 nonlocal failures
                 if failures:
                     failures -= 1
-                    await route.fulfill(status=502, json={
-                        "code": "upstream_failure", "scope": "gateway", "message": "Test loss",
-                    })
+                    await route.fulfill(
+                        status=502,
+                        json={
+                            "code": "upstream_failure",
+                            "scope": "gateway",
+                            "message": "Test loss",
+                        },
+                    )
                 else:
                     await route.continue_()
 

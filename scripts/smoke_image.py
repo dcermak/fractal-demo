@@ -56,14 +56,14 @@ def wait_for_workers(origin, processes):
                 workers = json.load(response)["workers"]
                 if workers:
                     return workers
-        except (URLError, TimeoutError):
+        except URLError, TimeoutError:
             pass
         time.sleep(0.1)
     raise RuntimeError("Worker did not register within the smoke-test deadline")
 
 
 def main():
-    for package in ("pytest", "ruff", "playwright", "hatchling"):
+    for package in ("pytest", "ruff", "playwright", "hatchling", "yaml"):
         assert importlib.util.find_spec(package) is None, f"Development package shipped: {package}"
     gateway_port, worker_port = available_port(), available_port()
     while worker_port == gateway_port:
@@ -75,13 +75,26 @@ def main():
         config.write_text(f"port = {gateway_port}\nworker_port = {worker_port}\n")
         try:
             with (
-                running([str(BIN / "fractal-gateway"), "--config", str(config)],
-                        directory / "gateway.log") as gateway,
-                running([
-                    str(BIN / "fractal-worker"), "--node", "image-smoke",
-                    "--host-ip", "127.0.0.1", "--bind", "127.0.0.1",
-                    "--port", str(worker_port), "--gateway-url", origin,
-                ], directory / "worker.log") as worker,
+                running(
+                    [str(BIN / "fractal-gateway"), "--config", str(config)],
+                    directory / "gateway.log",
+                ) as gateway,
+                running(
+                    [
+                        str(BIN / "fractal-worker"),
+                        "--node",
+                        "image-smoke",
+                        "--host-ip",
+                        "127.0.0.1",
+                        "--bind",
+                        "127.0.0.1",
+                        "--port",
+                        str(worker_port),
+                        "--gateway-url",
+                        origin,
+                    ],
+                    directory / "worker.log",
+                ) as worker,
             ):
                 roster = wait_for_workers(origin, (gateway, worker))
                 assert len(roster) == 1 and roster[0]["node"] == "image-smoke"
@@ -92,11 +105,20 @@ def main():
                 for path in ("/", "/static/app.css", "/static/app.js", "/static/scheduler.js"):
                     with HTTP.open(origin + path, timeout=3) as response:
                         assert response.read(), f"Empty packaged asset: {path}"
-                query = urlencode({
-                    "xmin": 0, "ymin": 0, "pixel_size": 3, "px": 0, "py": 0,
-                    "width": 2, "height": 1, "iterations": 20, "palette": "cyber",
-                    "expected_process_id": selected["process_id"],
-                })
+                query = urlencode(
+                    {
+                        "xmin": 0,
+                        "ymin": 0,
+                        "pixel_size": 3,
+                        "px": 0,
+                        "py": 0,
+                        "width": 2,
+                        "height": 1,
+                        "iterations": 20,
+                        "palette": "cyber",
+                        "expected_process_id": selected["process_id"],
+                    }
+                )
                 render_url = origin + selected["render_url"] + "?" + query
                 with HTTP.open(render_url, timeout=10) as response:
                     assert response.headers["X-Worker-ID"] == selected["process_id"]
@@ -108,8 +130,10 @@ def main():
                         assert image.getpixel((0, 0)) == (10, 13, 20)
                         # Independent c=3 escape after one iteration, on the first color segment.
                         weight = (2 - math.log2(math.log(3))) / 8
-                        expected = tuple(math.floor(a + weight * (b - a))
-                                         for a, b in zip((18, 25, 65), (33, 205, 225), strict=True))
+                        expected = tuple(
+                            math.floor(a + weight * (b - a))
+                            for a, b in zip((18, 25, 65), (33, 205, 225), strict=True)
+                        )
                         assert image.getpixel((1, 0)) == expected
         except BaseException:
             for log in directory.glob("*.log"):

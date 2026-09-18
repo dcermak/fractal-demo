@@ -18,8 +18,15 @@ from fractal_demo.render import render_tile
 
 def query(process_id, **changes):
     values = {
-        "xmin": "0.0", "ymin": "0.0", "pixel_size": "3.0", "px": "0", "py": "0",
-        "width": "2", "height": "1", "iterations": "20", "palette": "cyber",
+        "xmin": "0.0",
+        "ymin": "0.0",
+        "pixel_size": "3.0",
+        "px": "0",
+        "py": "0",
+        "width": "2",
+        "height": "1",
+        "iterations": "20",
+        "palette": "cyber",
         "expected_process_id": process_id,
     }
     values.update({key: str(value) for key, value in changes.items()})
@@ -27,16 +34,27 @@ def query(process_id, **changes):
 
 
 def worker_app(*, renderer=render_tile, gateway_url="http://127.0.0.1:1", node="node-a"):
-    return worker.create_worker_app(worker.WorkerSettings(
-        node=node, host_ip="127.0.0.1", gateway_url=gateway_url,
-        registration_interval=0.02, registration_timeout=0.5,
-    ), renderer=renderer)
+    return worker.create_worker_app(
+        worker.WorkerSettings(
+            node=node,
+            host_ip="127.0.0.1",
+            gateway_url=gateway_url,
+            registration_interval=0.02,
+            registration_timeout=0.5,
+        ),
+        renderer=renderer,
+    )
 
 
 async def register(client, server, process_id, *, node="node-a", host_ip="127.0.0.1"):
-    async with client.post(server.url + "/register", json={
-        "node": node, "process_id": process_id, "host_ip": host_ip,
-    }) as response:
+    async with client.post(
+        server.url + "/register",
+        json={
+            "node": node,
+            "process_id": process_id,
+            "host_ip": host_ip,
+        },
+    ) as response:
         assert response.status == 200, await response.text()
         assert await response.json() == {"process_id": process_id}
 
@@ -71,8 +89,10 @@ async def assert_png(response, process_id, node="node-a"):
         assert image.getpixel((0, 0)) == (10, 13, 20)  # c=0 never escapes.
         # c=3 escapes at n=1, z=3. Independently interpolate the first palette segment.
         weight = (2 - math.log2(math.log(3))) / 8
-        expected = tuple(math.floor(a + weight * (b - a))
-                         for a, b in zip((18, 25, 65), (33, 205, 225), strict=True))
+        expected = tuple(
+            math.floor(a + weight * (b - a))
+            for a, b in zip((18, 25, 65), (33, 205, 225), strict=True)
+        )
         assert image.getpixel((1, 0)) == expected
 
 
@@ -88,12 +108,16 @@ def test_periodic_registration_roster_and_real_proxy_pixels(tcp_app, wait_for):
                 ports["node-a"] = back.port
                 backend[worker.STATE].listener_ready.set()
                 await wait_for(lambda: app[gateway.STATE].registry.lookup(process_id) is not None)
-                assert await roster(client, front) == [{
-                    "node": "node-a", "process_id": process_id,
-                    "render_url": f"/api/render/{process_id}",
-                }]
-                async with client.get(front.url + f"/api/render/{process_id}",
-                                      params=query(process_id)) as response:
+                assert await roster(client, front) == [
+                    {
+                        "node": "node-a",
+                        "process_id": process_id,
+                        "render_url": f"/api/render/{process_id}",
+                    }
+                ]
+                async with client.get(
+                    front.url + f"/api/render/{process_id}", params=query(process_id)
+                ) as response:
                     await assert_png(response, process_id)
                 async with client.get(front.url + "/api/config") as response:
                     assert response.status == 200
@@ -126,8 +150,9 @@ def test_two_local_workers_use_their_configured_ports(tcp_app, tmp_path):
                 assert {row["node"]: row["process_id"] for row in rows} == identities
 
                 async def render_worker(row):
-                    async with client.get(front.url + row["render_url"],
-                                          params=query(row["process_id"])) as response:
+                    async with client.get(
+                        front.url + row["render_url"], params=query(row["process_id"])
+                    ) as response:
                         await assert_png(response, row["process_id"], row["node"])
 
                 await asyncio.gather(*(render_worker(row) for row in rows))
@@ -157,25 +182,47 @@ def test_local_mapping_to_gateway_is_rejected_and_logged(tcp_app, wait_for, capl
                 await wait_for(lambda: "routes to the gateway" in caplog.text)
                 assert "local_worker_ports" in caplog.text
                 assert await roster(client, front) == []
-                async with client.post(front.url + "/register", json={
-                    "node": "node-a", "process_id": process_id, "host_ip": "127.0.0.1",
-                }) as response:
+                async with client.post(
+                    front.url + "/register",
+                    json={
+                        "node": "node-a",
+                        "process_id": process_id,
+                        "host_ip": "127.0.0.1",
+                    },
+                ) as response:
                     await error(response, 422, "invalid_request", "gateway")
-                async with client.get(front.url + f"/api/render/{process_id}",
-                                      params=query(process_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{process_id}", params=query(process_id)
+                ) as response:
                     await error(response, 404, "unknown_worker", "gateway")
                 assert unexpected_renders == []
 
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("change", [
-    "missing", "duplicate", "unknown", {"xmin": "nan"}, {"ymin": "inf"},
-    {"pixel_size": "-inf"}, {"width": 0}, {"height": 257}, {"px": -1},
-    {"px": 8191, "width": 2}, {"iterations": 10001}, {"iterations": "1.5"},
-    {"pixel_size": "1e-14"}, {"pixel_size": 5}, {"xmin": -5}, {"xmin": 3},
-    {"palette": "unknown"}, {"expected_process_id": "not-a-uuid"},
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "missing",
+        "duplicate",
+        "unknown",
+        {"xmin": "nan"},
+        {"ymin": "inf"},
+        {"pixel_size": "-inf"},
+        {"width": 0},
+        {"height": 257},
+        {"px": -1},
+        {"px": 8191, "width": 2},
+        {"iterations": 10001},
+        {"iterations": "1.5"},
+        {"pixel_size": "1e-14"},
+        {"pixel_size": 5},
+        {"xmin": -5},
+        {"xmin": 3},
+        {"palette": "unknown"},
+        {"expected_process_id": "not-a-uuid"},
+    ],
+)
 def test_invalid_render_never_computes_on_worker_or_gateway(tcp_app, change):
     async def scenario():
         calls = []
@@ -199,8 +246,10 @@ def test_invalid_render_never_computes_on_worker_or_gateway(tcp_app, change):
                     params["extra"] = "1"
                 else:
                     params.update({key: str(value) for key, value in change.items()})
-                for url, scope in ((back.url + "/render", "worker"),
-                                   (front.url + f"/api/render/{process_id}", "gateway")):
+                for url, scope in (
+                    (back.url + "/render", "worker"),
+                    (front.url + f"/api/render/{process_id}", "gateway"),
+                ):
                     async with client.get(url, params=params) as response:
                         await error(response, 422, "invalid_request", scope)
                 assert calls == []
@@ -224,8 +273,10 @@ def test_head_and_wrong_identity_do_not_take_compute_slot(tcp_app):
             app = gateway.create_gateway_app(gateway.GatewaySettings(worker_port=back.port))
             async with tcp_app(app) as front, ClientSession() as client:
                 await register(client, front, process_id)
-                for url, scope in ((back.url + "/render", "worker"),
-                                   (front.url + f"/api/render/{process_id}", "gateway")):
+                for url, scope in (
+                    (back.url + "/render", "worker"),
+                    (front.url + f"/api/render/{process_id}", "gateway"),
+                ):
                     async with client.head(url, params=query(process_id)) as response:
                         assert response.status == 405
                     async with client.get(url, params=query(str(uuid.uuid4()))) as response:
@@ -240,7 +291,9 @@ def test_head_and_wrong_identity_do_not_take_compute_slot(tcp_app):
 
 
 def test_disconnect_retains_permit_while_health_and_registration_continue(
-    tcp_app, held_renderer, wait_for,
+    tcp_app,
+    held_renderer,
+    wait_for,
 ):
     async def scenario():
         ports = {}
@@ -263,8 +316,9 @@ def test_disconnect_retains_permit_while_health_and_registration_continue(
                 ports["node-a"] = back.port
                 state = backend[worker.STATE]
                 state.listener_ready.set()
-                pending = asyncio.create_task(client.get(back.url + "/render",
-                                                         params=query(state.process_id)))
+                pending = asyncio.create_task(
+                    client.get(back.url + "/render", params=query(state.process_id))
+                )
                 try:
                     await wait_for(held_renderer.entered.is_set)
                     await wait_for(lambda: app[gateway.STATE].registry.lookup(state.process_id))
@@ -276,8 +330,9 @@ def test_disconnect_retains_permit_while_health_and_registration_continue(
                         await cancelled.wait()
                     assert state.future is not None and not state.future.done()
                     for expected in (str(uuid.uuid4()), state.process_id):
-                        async with client.get(back.url + "/render",
-                                              params=query(expected)) as response:
+                        async with client.get(
+                            back.url + "/render", params=query(expected)
+                        ) as response:
                             if expected == state.process_id:
                                 await error(response, 503, "busy", "worker")
                             else:
@@ -285,9 +340,12 @@ def test_disconnect_retains_permit_while_health_and_registration_continue(
                     async with client.get(back.url + "/healthz") as response:
                         assert response.status == 200
                         assert (await response.json())["process_id"] == state.process_id
-                    await wait_for(lambda: (
-                        app[gateway.STATE].registry.lookup(state.process_id).last_seen > received
-                    ))
+                    await wait_for(
+                        lambda: (
+                            app[gateway.STATE].registry.lookup(state.process_id).last_seen
+                            > received
+                        )
+                    )
                     assert held_renderer.calls == 1
                     assert held_renderer.finished == 0
                 finally:
@@ -296,8 +354,9 @@ def test_disconnect_retains_permit_while_health_and_registration_continue(
                     with contextlib.suppress(asyncio.CancelledError):
                         await pending
                 await wait_for(lambda: state.future is None)
-                async with client.get(back.url + "/render",
-                                      params=query(state.process_id)) as response:
+                async with client.get(
+                    back.url + "/render", params=query(state.process_id)
+                ) as response:
                     await assert_png(response, state.process_id)
                 assert held_renderer.calls == held_renderer.finished == 2
 
@@ -305,15 +364,20 @@ def test_disconnect_retains_permit_while_health_and_registration_continue(
 
 
 def test_gateway_and_worker_busy_scopes_with_independent_control_requests(
-    tcp_app, held_renderer, wait_for,
+    tcp_app,
+    held_renderer,
+    wait_for,
 ):
     async def scenario():
         backend = worker_app(renderer=held_renderer)
         process_id = backend[worker.STATE].process_id
         async with tcp_app(backend, ready=False) as back:
-            app = gateway.create_gateway_app(gateway.GatewaySettings(
-                worker_port=back.port, proxy_limit=1,
-            ))
+            app = gateway.create_gateway_app(
+                gateway.GatewaySettings(
+                    worker_port=back.port,
+                    proxy_limit=1,
+                )
+            )
             async with tcp_app(app) as front, ClientSession() as client:
                 await register(client, front, process_id)
                 url = front.url + f"/api/render/{process_id}"
@@ -363,9 +427,14 @@ def test_registry_exact_expiry_capacity_refresh_and_same_process_return(tcp_app)
             await register(client, front, second, node="node-b")
             now[0] = 1
             await register(client, front, second, node="node-b")  # Refresh at capacity.
-            async with client.post(front.url + "/register", json={
-                "node": "node-c", "process_id": third, "host_ip": "127.0.0.1",
-            }) as response:
+            async with client.post(
+                front.url + "/register",
+                json={
+                    "node": "node-c",
+                    "process_id": third,
+                    "host_ip": "127.0.0.1",
+                },
+            ) as response:
                 await error(response, 503, "busy", "gateway")
             now[0] = math.nextafter(10, 0)
             assert len(await roster(client, front)) == 2
@@ -373,13 +442,15 @@ def test_registry_exact_expiry_capacity_refresh_and_same_process_return(tcp_app)
             # Admission itself must expire node-a before checking capacity.
             await register(client, front, third, node="node-c")
             assert {row["process_id"] for row in await roster(client, front)} == {second, third}
-            async with client.get(front.url + f"/api/render/{first}",
-                                  params=query(first)) as response:
+            async with client.get(
+                front.url + f"/api/render/{first}", params=query(first)
+            ) as response:
                 await error(response, 404, "unknown_worker", "gateway")
             now[0] = 11
             # Lookup itself must expire node-b at the exact boundary.
-            async with client.get(front.url + f"/api/render/{second}",
-                                  params=query(second)) as response:
+            async with client.get(
+                front.url + f"/api/render/{second}", params=query(second)
+            ) as response:
                 await error(response, 404, "unknown_worker", "gateway")
             await register(client, front, first)
             assert {row["process_id"] for row in await roster(client, front)} == {first, third}
@@ -408,17 +479,20 @@ def test_replacement_at_same_tcp_address_rejects_stale_selection(tcp_app):
         async with tcp_app(replacement, port=port, ready=False), tcp_app(app) as front:
             async with ClientSession() as client:
                 await register(client, front, old_id)
-                async with client.get(front.url + f"/api/render/{old_id}",
-                                      params=query(old_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{old_id}", params=query(old_id)
+                ) as response:
                     await error(response, 409, "incarnation_mismatch", "worker")
                 assert calls == []
                 await register(client, front, new_id)
                 assert [row["process_id"] for row in await roster(client, front)] == [new_id]
-                async with client.get(front.url + f"/api/render/{old_id}",
-                                      params=query(old_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{old_id}", params=query(old_id)
+                ) as response:
                     await error(response, 404, "unknown_worker", "gateway")
-                async with client.get(front.url + f"/api/render/{new_id}",
-                                      params=query(new_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{new_id}", params=query(new_id)
+                ) as response:
                     await assert_png(response, new_id)
                 assert len(calls) == 1
 
@@ -433,7 +507,8 @@ def test_registration_interruption_expires_and_same_live_worker_returns(tcp_app,
         ports = {}
         registry = gateway.Registry(10, clock=lambda: now[0])
         app = gateway.create_gateway_app(
-            gateway.GatewaySettings(local_worker_ports=ports), registry=registry,
+            gateway.GatewaySettings(local_worker_ports=ports),
+            registry=registry,
         )
 
         @web.middleware
@@ -463,17 +538,28 @@ def test_registration_interruption_expires_and_same_live_worker_returns(tcp_app,
                 await wait_for(lambda: registry.lookup(process_id))
                 assert [row["process_id"] for row in await roster(client, front)] == [process_id]
                 assert {item["process_id"] for item in rejected} == {process_id}
-                async with client.get(front.url + f"/api/render/{process_id}",
-                                      params=query(process_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{process_id}", params=query(process_id)
+                ) as response:
                     await assert_png(response, process_id)
 
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("fault", [
-    "malformed-png", "redirect", "identity", "node", "encoding", "content-type",
-    "oversize", "truncated", "stall",
-])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "malformed-png",
+        "redirect",
+        "identity",
+        "node",
+        "encoding",
+        "content-type",
+        "oversize",
+        "truncated",
+        "stall",
+    ],
+)
 def test_bounded_proxy_against_actual_faulty_upstream(tcp_app, fault):
     async def scenario():
         process_id = str(uuid.uuid4())
@@ -492,9 +578,13 @@ def test_bounded_proxy_against_actual_faulty_upstream(tcp_app, fault):
             if fault == "redirect":
                 raise web.HTTPFound("/redirected")
             if fault in ("stall", "truncated"):
-                response = web.StreamResponse(headers={
-                    **headers, "Content-Type": "image/png", "Content-Length": "100",
-                })
+                response = web.StreamResponse(
+                    headers={
+                        **headers,
+                        "Content-Type": "image/png",
+                        "Content-Length": "100",
+                    }
+                )
                 await response.prepare(request)
                 await response.write(b"partial")
                 if fault == "truncated":
@@ -518,7 +608,8 @@ def test_bounded_proxy_against_actual_faulty_upstream(tcp_app, fault):
                 await response.write_eof()
                 return response
             return web.Response(
-                body=body, headers=headers,
+                body=body,
+                headers=headers,
                 content_type="text/plain" if fault == "content-type" else "image/png",
             )
 
@@ -526,17 +617,22 @@ def test_bounded_proxy_against_actual_faulty_upstream(tcp_app, fault):
         upstream_app.router.add_get("/render", upstream)
         upstream_app.router.add_get("/redirected", redirected)
         async with tcp_app(upstream_app) as back:
-            app = gateway.create_gateway_app(gateway.GatewaySettings(
-                worker_port=back.port, connect_timeout=0.1, upstream_timeout=0.25,
-            ))
+            app = gateway.create_gateway_app(
+                gateway.GatewaySettings(
+                    worker_port=back.port,
+                    connect_timeout=0.1,
+                    upstream_timeout=0.25,
+                )
+            )
             async with (
                 tcp_app(app) as front,
                 ClientSession(timeout=ClientTimeout(total=3)) as client,
             ):
                 await register(client, front, process_id)
                 try:
-                    async with client.get(front.url + f"/api/render/{process_id}",
-                                          params=query(process_id)) as response:
+                    async with client.get(
+                        front.url + f"/api/render/{process_id}", params=query(process_id)
+                    ) as response:
                         if fault == "malformed-png":
                             assert response.status == 200
                             assert await response.read() == b"not a PNG"
@@ -559,12 +655,15 @@ def test_bounded_proxy_against_actual_faulty_upstream(tcp_app, fault):
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("host_ip,networks,override", [
-    ("127.0.0.1", ("192.0.2.0/24",), False),
-    ("192.0.2.1", ("192.0.2.0/24",), True),
-    ("localhost", ("127.0.0.0/8",), False),
-    ("http://127.0.0.1/render", ("127.0.0.0/8",), False),
-])
+@pytest.mark.parametrize(
+    "host_ip,networks,override",
+    [
+        ("127.0.0.1", ("192.0.2.0/24",), False),
+        ("192.0.2.1", ("192.0.2.0/24",), True),
+        ("localhost", ("127.0.0.0/8",), False),
+        ("http://127.0.0.1/render", ("127.0.0.0/8",), False),
+    ],
+)
 def test_forbidden_registration_never_connects(tcp_app, host_ip, networks, override):
     async def scenario():
         connections = []
@@ -576,19 +675,28 @@ def test_forbidden_registration_never_connects(tcp_app, host_ip, networks, overr
         listener = await asyncio.start_server(connected, "127.0.0.1", 0)
         async with listener:
             port = listener.sockets[0].getsockname()[1]
-            app = gateway.create_gateway_app(gateway.GatewaySettings(
-                worker_port=port, node_networks=networks,
-                local_worker_ports={"node-a": port} if override else {},
-            ))
+            app = gateway.create_gateway_app(
+                gateway.GatewaySettings(
+                    worker_port=port,
+                    node_networks=networks,
+                    local_worker_ports={"node-a": port} if override else {},
+                )
+            )
             async with tcp_app(app) as front, ClientSession() as client:
                 process_id = str(uuid.uuid4())
-                async with client.post(front.url + "/register", json={
-                    "node": "node-a", "process_id": process_id, "host_ip": host_ip,
-                }) as response:
+                async with client.post(
+                    front.url + "/register",
+                    json={
+                        "node": "node-a",
+                        "process_id": process_id,
+                        "host_ip": host_ip,
+                    },
+                ) as response:
                     await error(response, 422, "invalid_request", "gateway")
                 assert await roster(client, front) == []
-                async with client.get(front.url + f"/api/render/{process_id}",
-                                      params=query(process_id)) as response:
+                async with client.get(
+                    front.url + f"/api/render/{process_id}", params=query(process_id)
+                ) as response:
                     await error(response, 404, "unknown_worker", "gateway")
                 assert connections == []
                 assert app[gateway.STATE].active == 0
@@ -615,8 +723,9 @@ def test_registration_validation_leaves_registry_empty(tcp_app, fault):
             body += " " * 8192
         async with tcp_app(gateway.create_gateway_app(gateway.GatewaySettings())) as front:
             async with ClientSession() as client:
-                async with client.post(front.url + "/register", data=body,
-                                       headers={"Content-Type": "application/json"}) as response:
+                async with client.post(
+                    front.url + "/register", data=body, headers={"Content-Type": "application/json"}
+                ) as response:
                     if fault == "oversize":
                         await error(response, 413, "http_error", "gateway")
                     else:
@@ -639,9 +748,21 @@ def test_worker_entrypoint_restart_changes_uuid_and_registers_again(tcp_app, tmp
             for run in range(2):
                 with (tmp_path / f"worker-{run}.log").open("wb") as log:
                     process = await asyncio.create_subprocess_exec(
-                        executable, "--node", "node-a", "--host-ip", "127.0.0.1",
-                        "--bind", "127.0.0.1", "--port", str(port), "--gateway-url", front.url,
-                        "--registration-interval", "0.05", stdout=log, stderr=log,
+                        executable,
+                        "--node",
+                        "node-a",
+                        "--host-ip",
+                        "127.0.0.1",
+                        "--bind",
+                        "127.0.0.1",
+                        "--port",
+                        str(port),
+                        "--gateway-url",
+                        front.url,
+                        "--registration-interval",
+                        "0.05",
+                        stdout=log,
+                        stderr=log,
                     )
                     try:
                         async with asyncio.timeout(8):
@@ -654,8 +775,9 @@ def test_worker_entrypoint_restart_changes_uuid_and_registers_again(tcp_app, tmp
                         process_id = rows[0]["process_id"]
                         assert str(uuid.UUID(process_id)) == process_id
                         identities.append(process_id)
-                        async with client.get(front.url + rows[0]["render_url"],
-                                              params=query(process_id)) as response:
+                        async with client.get(
+                            front.url + rows[0]["render_url"], params=query(process_id)
+                        ) as response:
                             await assert_png(response, process_id)
                     finally:
                         if process.returncode is None:
@@ -677,9 +799,12 @@ def test_shutdown_drains_admitted_work_before_executor_closes(tcp_app, held_rend
         backend = worker_app(renderer=held_renderer)
         state = backend[worker.STATE]
         async with tcp_app(backend, ready=False) as back, ClientSession() as client:
-            pending = asyncio.create_task(client.get(
-                back.url + "/render", params=query(state.process_id),
-            ))
+            pending = asyncio.create_task(
+                client.get(
+                    back.url + "/render",
+                    params=query(state.process_id),
+                )
+            )
             stopping = None
             try:
                 await wait_for(held_renderer.entered.is_set)

@@ -50,17 +50,34 @@ class GatewaySettings:
     proxy_limit: int = 5
     connect_timeout: float = 1.0
     upstream_timeout: float = 10.0
-    geometry: dict = field(default_factory=lambda: {
-        "width": 960, "height": 540, "columns": 16, "rows": 9,
-    })
-    view: dict = field(default_factory=lambda: {
-        "xmin": -0.9, "ymin": 0.08, "pixel_size": 0.00025, "iterations": 800,
-    })
+    geometry: dict = field(
+        default_factory=lambda: {
+            "width": 960,
+            "height": 540,
+            "columns": 16,
+            "rows": 9,
+        }
+    )
+    view: dict = field(
+        default_factory=lambda: {
+            "xmin": -0.9,
+            "ymin": 0.08,
+            "pixel_size": 0.00025,
+            "iterations": 800,
+        }
+    )
     default_palette: str = "cyber"
-    timing: dict = field(default_factory=lambda: {
-        "poll_interval_ms": 500, "poll_timeout_ms": 2000, "render_timeout_ms": 12000,
-        "cooldown_ms": 350, "lost_ms": 600, "dwell_ms": 1500, "rate_window_ms": 5000,
-    })
+    timing: dict = field(
+        default_factory=lambda: {
+            "poll_interval_ms": 500,
+            "poll_timeout_ms": 2000,
+            "render_timeout_ms": 12000,
+            "cooldown_ms": 350,
+            "lost_ms": 600,
+            "dwell_ms": 1500,
+            "rate_window_ms": 5000,
+        }
+    )
     render_limit: int = 5
 
     def validate(self):
@@ -105,8 +122,12 @@ class GatewaySettings:
         # Validate both corners of the entire raster, with the same parser as actual requests.
         for px, py in ((0, 0), (width - width // columns, height - height // rows)):
             values = {
-                **self.view, "px": px, "py": py, "width": width // columns,
-                "height": height // rows, "palette": self.default_palette,
+                **self.view,
+                "px": px,
+                "py": py,
+                "width": width // columns,
+                "height": height // rows,
+                "palette": self.default_palette,
                 "expected_process_id": "00000000-0000-0000-0000-000000000000",
             }
             try:
@@ -125,8 +146,11 @@ class GatewaySettings:
 
     def browser_config(self):
         return {
-            "geometry": self.geometry, "view": self.view, "palettes": PALETTES,
-            "default_palette": self.default_palette, "timing": self.timing,
+            "geometry": self.geometry,
+            "view": self.view,
+            "palettes": PALETTES,
+            "default_palette": self.default_palette,
+            "timing": self.timing,
             "render_limit": self.render_limit,
         }
 
@@ -138,8 +162,10 @@ def bounded_int(value, key, low, high):
 
 def positive(value, key):
     if (
-        isinstance(value, bool) or not isinstance(value, (int, float))
-        or not math.isfinite(value) or value <= 0
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or value <= 0
     ):
         raise ProtocolError(f"{key} must be positive and finite")
 
@@ -150,8 +176,16 @@ def load_settings(path: str | None) -> GatewaySettings:
     with Path(path).open("rb") as stream:
         data = tomllib.load(stream)
     scalar_keys = {
-        "bind", "port", "node_networks", "worker_port", "expiry_seconds", "proxy_limit",
-        "connect_timeout", "upstream_timeout", "default_palette", "render_limit",
+        "bind",
+        "port",
+        "node_networks",
+        "worker_port",
+        "expiry_seconds",
+        "proxy_limit",
+        "connect_timeout",
+        "upstream_timeout",
+        "default_palette",
+        "render_limit",
     }
     table_keys = {"geometry", "view", "timing", "local_worker_ports"}
     if set(data) - scalar_keys - table_keys:
@@ -193,7 +227,8 @@ class Registry:
     def expire(self):
         now = self.clock()
         self.records = {
-            node: record for node, record in self.records.items()
+            node: record
+            for node, record in self.records.items()
             if now - record.last_seen < self.expiry
         }
 
@@ -202,7 +237,10 @@ class Registry:
         if registration.node not in self.records and len(self.records) >= self.capacity:
             return False
         self.records[registration.node] = WorkerRecord(
-            registration.node, registration.process_id, registration.host_ip, self.clock(),
+            registration.node,
+            registration.process_id,
+            registration.host_ip,
+            self.clock(),
         )
         return True
 
@@ -212,9 +250,14 @@ class Registry:
 
     def roster(self):
         self.expire()
-        return [{"node": record.node, "process_id": record.process_id,
-                 "render_url": f"/api/render/{record.process_id}"}
-                for record in self.records.values()]
+        return [
+            {
+                "node": record.node,
+                "process_id": record.process_id,
+                "render_url": f"/api/render/{record.process_id}",
+            }
+            for record in self.records.values()
+        ]
 
 
 class GatewayState:
@@ -236,7 +279,8 @@ async def register(request):
         if not literal_ip(registration.host_ip).is_loopback:
             raise ProtocolError("local_worker_ports overrides require a loopback host_ip")
     target_port = state.settings.local_worker_ports.get(
-        registration.node, state.settings.worker_port,
+        registration.node,
+        state.settings.worker_port,
     )
     # Use the bound socket's port, including when a test listener chooses an ephemeral port.
     listener = request.transport.get_extra_info("sockname")
@@ -274,12 +318,18 @@ async def proxy(request):
     selected_id = process_id(request.match_info["process_id"])
     if selected_id != tile.expected_process_id:
         return error_response(
-            409, "incarnation_mismatch", "Selected process IDs disagree", "gateway",
+            409,
+            "incarnation_mismatch",
+            "Selected process IDs disagree",
+            "gateway",
         )
     record = state.registry.lookup(selected_id)
     if record is None:
         return error_response(
-            404, "unknown_worker", "Worker registration is no longer current", "gateway",
+            404,
+            "unknown_worker",
+            "Worker registration is no longer current",
+            "gateway",
         )
     if state.active >= state.settings.proxy_limit:
         return error_response(503, "busy", "Gateway render capacity is occupied", "gateway")
@@ -289,7 +339,9 @@ async def proxy(request):
     state.active += 1
     try:
         async with state.session.get(
-            url, params=tile.query(), allow_redirects=False,
+            url,
+            params=tile.query(),
+            allow_redirects=False,
             headers={"Accept-Encoding": "identity"},
         ) as response:
             encoding = response.headers.get("Content-Encoding", "identity").lower()
@@ -304,18 +356,27 @@ async def proxy(request):
                 if response.content_type != "image/png":
                     raise ProtocolError("Expected an upstream PNG response")
                 body = await read_bounded(response)
-                return web.Response(body=body, content_type="image/png", headers={
-                    **NO_STORE, "X-Worker-ID": record.process_id, "X-Render-Node": record.node,
-                })
+                return web.Response(
+                    body=body,
+                    content_type="image/png",
+                    headers={
+                        **NO_STORE,
+                        "X-Worker-ID": record.process_id,
+                        "X-Render-Node": record.node,
+                    },
+                )
             if not 400 <= response.status <= 599 or response.content_type != "application/json":
                 raise ProtocolError("Unexpected upstream status or error content type")
             body = await read_bounded(response, 8192)
             error = unique_json(body)
             if (
-                not isinstance(error, dict) or set(error) != {"code", "message", "scope"}
+                not isinstance(error, dict)
+                or set(error) != {"code", "message", "scope"}
                 or error["scope"] != "worker"
-                or not isinstance(error["code"], str) or not 1 <= len(error["code"]) <= 64
-                or not isinstance(error["message"], str) or len(error["message"]) > 400
+                or not isinstance(error["code"], str)
+                or not 1 <= len(error["code"]) <= 64
+                or not isinstance(error["message"], str)
+                or len(error["message"]) > 400
             ):
                 raise ProtocolError("Invalid upstream error response")
             return web.json_response(error, status=response.status, headers=NO_STORE)
@@ -325,7 +386,10 @@ async def proxy(request):
         return error_response(504, "upstream_timeout", "Worker render path timed out", "gateway")
     except ClientError:
         return error_response(
-            502, "upstream_failure", "Lost contact with worker render path", "gateway",
+            502,
+            "upstream_failure",
+            "Lost contact with worker render path",
+            "gateway",
         )
     finally:
         state.active -= 1
@@ -351,10 +415,12 @@ async def session_context(app):
     async with ClientSession(
         connector=TCPConnector(limit=settings.proxy_limit),
         timeout=ClientTimeout(
-            total=settings.upstream_timeout, sock_connect=settings.connect_timeout,
+            total=settings.upstream_timeout,
+            sock_connect=settings.connect_timeout,
             ceil_threshold=math.inf,
         ),
-        trust_env=False, auto_decompress=False,
+        trust_env=False,
+        auto_decompress=False,
     ) as session:
         state.session = session
         yield
@@ -363,7 +429,8 @@ async def session_context(app):
 def create_gateway_app(settings: GatewaySettings, *, registry=None) -> web.Application:
     settings.validate()
     app = web.Application(
-        client_max_size=REGISTRATION_LIMIT + 1, middlewares=[error_middleware("gateway")],
+        client_max_size=REGISTRATION_LIMIT + 1,
+        middlewares=[error_middleware("gateway")],
     )
     app[STATE] = GatewayState(settings, registry or Registry(settings.expiry_seconds))
     app.cleanup_ctx.append(session_context)

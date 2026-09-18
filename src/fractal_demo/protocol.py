@@ -20,8 +20,16 @@ NO_STORE = {"Cache-Control": "no-store"}
 NODE_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
 INTEGER_PATTERN = re.compile(r"[0-9]+\Z")
 RENDER_FIELDS = {
-    "xmin", "ymin", "pixel_size", "px", "py", "width", "height", "iterations",
-    "palette", "expected_process_id",
+    "xmin",
+    "ymin",
+    "pixel_size",
+    "px",
+    "py",
+    "width",
+    "height",
+    "iterations",
+    "palette",
+    "expected_process_id",
 }
 
 
@@ -120,8 +128,10 @@ def parse_render_query(query: MultiMapping[str]) -> RenderRequest:
     if not 1e-13 <= pixel_size <= 4:
         raise ProtocolError("pixel_size must be from 1e-13 through 4")
     coordinates = (
-        xmin + px * pixel_size, xmin + (px + width - 1) * pixel_size,
-        ymin + py * pixel_size, ymin + (py + height - 1) * pixel_size,
+        xmin + px * pixel_size,
+        xmin + (px + width - 1) * pixel_size,
+        ymin + py * pixel_size,
+        ymin + (py + height - 1) * pixel_size,
     )
     if not all(-4 <= point <= 4 for point in coordinates):
         raise ProtocolError("first and last sampled coordinates must be within [-4, 4]")
@@ -129,7 +139,15 @@ def parse_render_query(query: MultiMapping[str]) -> RenderRequest:
     if palette not in PALETTE_IDS:
         raise ProtocolError("palette must be cyber or fire")
     return RenderRequest(
-        xmin, ymin, pixel_size, px, py, width, height, iterations, palette,
+        xmin,
+        ymin,
+        pixel_size,
+        px,
+        py,
+        width,
+        height,
+        iterations,
+        palette,
         process_id(query["expected_process_id"]),
     )
 
@@ -156,7 +174,8 @@ def parse_registration(body: bytes, allowed_networks: tuple) -> Registration:
 def error_response(status: int, code: str, message: str, scope: str) -> web.Response:
     return web.json_response(
         {"code": code, "message": message[:400], "scope": scope},
-        status=status, headers=NO_STORE,
+        status=status,
+        headers=NO_STORE,
     )
 
 

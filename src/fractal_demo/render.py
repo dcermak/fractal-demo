@@ -46,8 +46,8 @@ def render_tile(request: RenderRequest) -> bytes:
             escaped = magnitude_squared > 4.0
             escaped_indices = indices[escaped]
             # n + 1 - log2(log(|z_n|)); log(|z|) = log(|z|**2) / 2.
-            smooth[escaped_indices] = iteration + 1.0 - np.log2(
-                0.5 * np.log(magnitude_squared[escaped])
+            smooth[escaped_indices] = (
+                iteration + 1.0 - np.log2(0.5 * np.log(magnitude_squared[escaped]))
             )
             active[escaped_indices] = False
 
