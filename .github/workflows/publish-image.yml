@@ -40,19 +40,14 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
       - name: Build local runtime image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Containerfile
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: fractal-worker:ci
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+        env:
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          docker build --platform linux/amd64 -f Containerfile -t fractal-worker:ci \
+            --label "org.opencontainers.image.source=$SOURCE" \
+            --label "org.opencontainers.image.revision=$COMMIT" .
       - name: Verify default worker entrypoint and installed application
         run: |
           docker run --rm fractal-worker:ci --help
@@ -79,15 +74,10 @@ jobs:
             --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "$image@sha256:")
           test -n "$reference"
           printf '%s\n' "$reference" > worker-image.txt
-          {
-            echo '## Worker image'
-            echo
-            echo "Commit: $COMMIT"
-            echo
-            echo "Tag: \`$tag\`"
-            echo
-            echo "Deploy by digest: \`$reference\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: \`$tag\` — digest: \`$reference\`" >> "$GITHUB_STEP_SUMMARY"
+          docker tag fractal-worker:ci "$image:latest"
+          docker push "$image:latest"
+          echo "Latest: \`$image:latest\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Save the published reference
         uses: actions/upload-artifact@v4
         with:
