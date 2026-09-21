@@ -17,7 +17,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install uv
         run: |
           PIPX_BIN_DIR="$HOME/.local/bin" pipx install uv
@@ -41,7 +41,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build local runtime image
         env:
           SOURCE: ${{ github.server_url }}/${{ github.repository }}
