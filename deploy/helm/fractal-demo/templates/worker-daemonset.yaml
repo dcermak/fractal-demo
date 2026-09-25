@@ -54,7 +54,7 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
             - name: GATEWAY_URL
-              value: {{ required "Set gatewayUrl or generate values with scripts/deployment_values.py" .Values.gatewayUrl | quote }}
+              value: {{ required "Set gatewayUrl in worker values" .Values.gatewayUrl | quote }}
             - name: WORKER_PORT
               value: {{ .Values.worker.port | quote }}
             - name: REGISTRATION_INTERVAL

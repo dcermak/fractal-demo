@@ -76,8 +76,8 @@ reload the page, and click **Reset settings** to use the new defaults.
 
 ## Configuration
 
-The gateway can also run in a container with Helm and host networking.
-See [Podman and rootful Quadlet deployment](docs/deployment.md#running-the-gateway-container).
+The gateway can run from a container image with a rootful Quadlet; Helm and the chart are inside
+the image. See [deployment](docs/deployment.md#installing-on-the-demo-host) for the host setup script.
 
 The gateway reads `--config PATH` at startup. Without a file, it uses loopback-only defaults.
 See [config.example.toml](config.example.toml) for all settings and their initial values.
@@ -87,7 +87,7 @@ The gateway reads the provisioner's updated kubeconfig and restores a missing or
 The dashboard shows deployment status and a **Redeploy workers** button for an immediate check.
 An installed release stays unchanged. Rendering resumes as workers register.
 Set the top-level `poll_interval_seconds` in TOML to adjust deployment checks. The default is 3 seconds.
-See [automatic kiosk deployment](docs/deployment.md#enabling-automatic-kiosk-deployment) for setup.
+See [deployment](docs/deployment.md) for setup.
 
 Keep these rules in mind:
 
@@ -106,12 +106,11 @@ Use a trusted demo network. Registration and worker rendering have no authentica
 Keep the gateway and worker host ports off the shared conference network.
 The application does not configure firewalls or manage virtual machines.
 
-Deploy workers with the Helm chart and values generated from the host TOML and libvirt network.
-See the [deployment guide](docs/deployment.md) for commands and image overrides.
+The host setup script generates gateway TOML and worker Helm values from the supplied address,
+node network, and image references. See the [deployment guide](docs/deployment.md).
 Cluster reconstruction removes workload definitions and image-pull credentials.
 With `--kubeconfig`, the host gateway reinstalls the release. Private-image credentials require separate restoration.
-Without this flag, reinstall the release manually. See
-[Restoring and rolling back](docs/deployment.md#restoring-and-rolling-back).
+Without this flag, reinstall the release manually.
 
 ## Documentation
 

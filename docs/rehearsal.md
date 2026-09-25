@@ -1,7 +1,7 @@
 # Pre-demo checklist
 
 Use the intended kiosk hardware, browser, pane dimensions, and deployment configuration.
-Keep the working image digest and local configuration available for [restoration](deployment.md#restoring-and-rolling-back).
+Keep the working image digests and local configuration available for [recovery](deployment.md#changes-and-recovery).
 Record failures with the settings and steps needed to reproduce them.
 
 ## Startup and controls
@@ -44,7 +44,7 @@ Keep the host gateway running during node-loss checks.
 - [ ] Remove all workers, then restore one. Pending work resumes without restarting the browser.
 - [ ] Remove a control-plane node. Check whether the deployment's surviving worker networking continues.
 - [ ] Stop and restart the host gateway. The page reports unavailable discovery and recovers after restart.
-- [ ] Reconstruct the cluster and follow the [restoration procedure](deployment.md#restoring-and-rolling-back).
+- [ ] Reconstruct the cluster and check [recovery](deployment.md#changes-and-recovery).
       Reapplied workers register and complete the retained frame.
 - [ ] Restore the previous image and matching configuration. Verify registration and rendering.
 - [ ] Confirm healthy renders, responsive probes, and orderly shutdown under the deployed CPU and memory limits.
@@ -63,8 +63,7 @@ Keep the host gateway running during node-loss checks.
 
 ### Checking container deployment
 
-- [ ] Start the gateway with the documented Podman command. Confirm worker registration and rendering.
-- [ ] Stop that container and start the Quadlet service. Check its journal and confirm rendering.
+- [ ] Run the host setup script and check the Quadlet service journal, worker registration, and rendering.
 - [ ] Recreate the cluster. Confirm the mounted kubeconfig replacement restores workers without restarting the gateway.
 - [ ] Reboot the demo host. Confirm the bridge, gateway service, and rendering return.
 

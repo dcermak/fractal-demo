@@ -97,15 +97,13 @@ Install Helm 3 or newer, then run the CLI-to-manifest checks:
 uv run --frozen python -m pytest tests/deploy/chart.py
 ```
 
-These tests run the values helper, `helm lint`, and `helm template`, then inspect the rendered YAML.
-Only the external `virsh` command is replaced with fixture output. No cluster or live libvirt connection is needed.
-The tests cover discovery, explicit overrides, non-default ports, and invalid configuration.
-CI invokes them explicitly; missing Helm fails the run.
+These tests run the host setup generator, `helm lint`, and `helm template`, then inspect the
+rendered YAML. The default test suite checks generated host files and installation with a
+substituted `systemctl`. CI invokes the chart tests explicitly; they require Helm but no cluster.
 
 ## Container checks
 
-See [Building locally](deployment.md#building-locally) for the container build and image smoke check,
-and [Publishing images](deployment.md#publishing-images) for what CI runs.
+See [Building and publishing images](deployment.md#building-and-publishing-images) for image details.
 Build targets `worker` and `gateway` share the installed Python environment.
 The gateway checks also run its Helm binary and render the packaged chart.
 Playwright and other development dependencies are excluded from both images.

@@ -6,7 +6,7 @@ After=network-online.target
 StartLimitIntervalSec=0
 
 [Container]
-Image=ghcr.io/dcermak/fractal-demo-gateway:latest
+Image=$GATEWAY_IMAGE
 ContainerName=fractal-gateway
 Network=host
 User=0
@@ -17,8 +17,7 @@ ReadOnly=true
 Tmpfs=/tmp:rw,nosuid,nodev,mode=1777
 Environment=HOME=/tmp
 Volume=/etc/fractal-demo:/etc/fractal-demo:ro
-# Replace the source with the provisioner's stable credential directory.
-Volume=/var/lib/fractal-demo/cluster:/run/fractal-cluster:ro
+Volume=$CLUSTER_DIR:/run/fractal-cluster:ro
 Exec=--config /etc/fractal-demo/config.toml --kubeconfig /run/fractal-cluster/kubeconfig --helm-chart /opt/fractal/deploy/helm/fractal-demo --helm-values /etc/fractal-demo/values.local.json
 StopTimeout=90
 
