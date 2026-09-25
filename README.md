@@ -3,6 +3,8 @@
 A distributed Mandelbrot renderer for a conference kiosk. Workers compute tiles, and the browser
 assembles the image. Tile borders identify the node that produced each tile.
 
+![Renderer](./renderer.png)
+
 The gateway runs on the demo PC, outside the disposable Kubernetes cluster. When a worker disappears,
 unfinished tiles move to surviving workers. With no workers, the page retains its image and waits
 for workers to register again.
