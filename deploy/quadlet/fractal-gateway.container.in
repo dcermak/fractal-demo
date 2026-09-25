@@ -16,9 +16,9 @@ NoNewPrivileges=true
 ReadOnly=true
 Tmpfs=/tmp:rw,nosuid,nodev,mode=1777
 Environment=HOME=/tmp
-Volume=/etc/fractal-demo:/etc/fractal-demo:ro
-Volume=$CLUSTER_DIR:/run/fractal-cluster:ro
 Exec=--config /etc/fractal-demo/config.toml --kubeconfig /run/fractal-cluster/kubeconfig --helm-chart /opt/fractal/deploy/helm/fractal-demo --helm-values /etc/fractal-demo/values.local.json
+Volume=/etc/fractal-demo:/etc/fractal-demo:ro,Z
+Volume=$CLUSTER_DIR:/run/fractal-cluster:ro,Z
 StopTimeout=90
 
 [Service]
