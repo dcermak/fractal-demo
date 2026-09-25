@@ -10,6 +10,7 @@ import math
 import signal
 import time
 import tomllib
+from contextlib import suppress
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
@@ -18,6 +19,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, web
 from multidict import MultiDict
 from yarl import URL
 
+from .deployment import Deployment
 from .protocol import (
     NO_STORE,
     REGISTRATION_LIMIT,
@@ -79,6 +81,7 @@ class GatewaySettings:
         }
     )
     render_limit: int = 5
+    poll_interval_seconds: float = 3
 
     def validate(self):
         for key in ("port", "worker_port"):
@@ -100,7 +103,12 @@ class GatewaySettings:
             bounded_int(port, f"local_worker_ports.{node}", 1, 65535)
         bounded_int(self.proxy_limit, "proxy_limit", 1, 256)
         bounded_int(self.render_limit, "render_limit", 1, 32)
-        for key in ("expiry_seconds", "connect_timeout", "upstream_timeout"):
+        for key in (
+            "expiry_seconds",
+            "connect_timeout",
+            "upstream_timeout",
+            "poll_interval_seconds",
+        ):
             positive(getattr(self, key), key)
         if self.connect_timeout > self.upstream_timeout:
             raise ProtocolError("connect_timeout must not exceed upstream_timeout")
@@ -186,6 +194,7 @@ def load_settings(path: str | None) -> GatewaySettings:
         "upstream_timeout",
         "default_palette",
         "render_limit",
+        "poll_interval_seconds",
     }
     table_keys = {"geometry", "view", "timing", "local_worker_ports"}
     if set(data) - scalar_keys - table_keys:
@@ -267,6 +276,7 @@ class GatewayState:
         self.networks = tuple(ipaddress.ip_network(x) for x in settings.node_networks)
         self.active = 0
         self.session: ClientSession | None = None
+        self.deployment: Deployment | None = None
 
 
 STATE = web.AppKey("gateway_state", GatewayState)
@@ -400,6 +410,7 @@ ASSETS = {
     "/static/app.css": ("app.css", "text/css"),
     "/static/app.js": ("app.js", "text/javascript"),
     "/static/scheduler.js": ("scheduler.js", "text/javascript"),
+    "/static/vendor/htmx.min.js": ("vendor/htmx.min.js", "text/javascript"),
 }
 
 
@@ -426,14 +437,61 @@ async def session_context(app):
         yield
 
 
-def create_gateway_app(settings: GatewaySettings, *, registry=None) -> web.Application:
+async def deployment_context(app):
+    deployment = app[STATE].deployment
+    if deployment is None:
+        yield
+        return
+    task = asyncio.create_task(deployment.run(), name="fractal-deployment")
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+async def deployment_panel(request):
+    deployment = request.app[STATE].deployment
+    body = deployment.panel() if deployment is not None else ""
+    return web.Response(text=body, content_type="text/html", headers=NO_STORE)
+
+
+async def redeploy(request):
+    deployment = request.app[STATE].deployment
+    if deployment is None:
+        return web.Response(status=409, text="Automatic deployment is disabled.", headers=NO_STORE)
+    deployment.request_redeploy()
+    return await deployment_panel(request)
+
+
+def create_gateway_app(
+    settings: GatewaySettings,
+    *,
+    registry=None,
+    kubeconfig=None,
+    config_path=None,
+    chart_path=None,
+    values_path=None,
+) -> web.Application:
     settings.validate()
+    if kubeconfig is None and (chart_path is not None or values_path is not None):
+        raise ValueError("--helm-chart and --helm-values require --kubeconfig")
     app = web.Application(
         client_max_size=REGISTRATION_LIMIT + 1,
         middlewares=[error_middleware("gateway")],
     )
     app[STATE] = GatewayState(settings, registry or Registry(settings.expiry_seconds))
+    if kubeconfig is not None:
+        app[STATE].deployment = Deployment(
+            kubeconfig,
+            settings.poll_interval_seconds,
+            config_path,
+            chart_path=chart_path,
+            values_path=values_path,
+        )
     app.cleanup_ctx.append(session_context)
+    app.cleanup_ctx.append(deployment_context)
     for path in ASSETS:
         app.router.add_get(path, asset)
     app.router.add_get("/healthz", health)
@@ -441,11 +499,22 @@ def create_gateway_app(settings: GatewaySettings, *, registry=None) -> web.Appli
     app.router.add_get("/api/workers", workers)
     app.router.add_get("/api/config", config)
     app.router.add_get("/api/render/{process_id}", proxy, allow_head=False)
+    app.router.add_get("/deployment", deployment_panel)
+    app.router.add_post("/redeploy", redeploy)
     return app
 
 
-async def serve(settings):
-    runner = web.AppRunner(create_gateway_app(settings), handler_cancellation=True)
+async def serve(settings, *, kubeconfig=None, config_path=None, chart_path=None, values_path=None):
+    runner = web.AppRunner(
+        create_gateway_app(
+            settings,
+            kubeconfig=kubeconfig,
+            config_path=config_path,
+            chart_path=chart_path,
+            values_path=values_path,
+        ),
+        handler_cancellation=True,
+    )
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -465,10 +534,27 @@ async def serve(settings):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", help="Gateway TOML file; defaults to loopback-only settings")
+    parser.add_argument(
+        "--kubeconfig", help="Enable automatic Helm recovery using this changing file"
+    )
+    parser.add_argument(
+        "--helm-chart", help="Chart directory; requires --helm-values and --kubeconfig"
+    )
+    parser.add_argument(
+        "--helm-values", help="JSON values file; requires --helm-chart and --kubeconfig"
+    )
     args = parser.parse_args()
     try:
         settings = load_settings(args.config)
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+        asyncio.run(
+            serve(
+                settings,
+                kubeconfig=args.kubeconfig,
+                config_path=args.config,
+                chart_path=args.helm_chart,
+                values_path=args.helm_values,
+            )
+        )
     except (ValueError, OSError, TypeError) as exc:
         parser.error(str(exc))
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    asyncio.run(serve(settings))

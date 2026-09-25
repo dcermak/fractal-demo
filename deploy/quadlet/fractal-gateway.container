@@ -1,0 +1,32 @@
+[Unit]
+Description=Fractal demo gateway
+Wants=network-online.target
+After=network-online.target
+# Retry if the demo bridge is not present yet.
+StartLimitIntervalSec=0
+
+[Container]
+Image=ghcr.io/dcermak/fractal-demo-gateway:latest
+ContainerName=fractal-gateway
+Network=host
+User=0
+Group=0
+DropCapability=all
+NoNewPrivileges=true
+ReadOnly=true
+Tmpfs=/tmp:rw,nosuid,nodev,mode=1777
+Environment=HOME=/tmp
+Volume=/etc/fractal-demo:/etc/fractal-demo:ro
+# Replace the source with the provisioner's stable credential directory.
+Volume=/var/lib/fractal-demo/cluster:/run/fractal-cluster:ro
+Exec=--config /etc/fractal-demo/config.toml --kubeconfig /run/fractal-cluster/kubeconfig --helm-chart /opt/fractal/deploy/helm/fractal-demo --helm-values /etc/fractal-demo/values.local.json
+StopTimeout=90
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

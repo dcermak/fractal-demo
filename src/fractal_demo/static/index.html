@@ -7,6 +7,7 @@
     <title>Distributed Fractal Renderer</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/static/app.css">
+    <script src="/static/vendor/htmx.min.js" defer></script>
     <script type="module" src="/static/app.js"></script>
   </head>
   <body>
@@ -85,6 +86,7 @@
 
       <section class="pool" aria-labelledby="pool-heading">
         <div class="pool-header"><h2 id="pool-heading">Compute pool</h2><span>Tile borders identify the producing node</span></div>
+        <div id="deployment" hx-get="/deployment" hx-trigger="load" hx-swap="innerHTML"></div>
         <ul id="worker-legend" class="worker-legend"></ul>
         <p id="pool-empty" class="pool-empty">Waiting for worker discovery.</p>
       </section>

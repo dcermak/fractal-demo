@@ -10,6 +10,8 @@ connect_timeout = 1.0
 upstream_timeout = 10.0
 default_palette = "cyber"
 render_limit = 5
+# Helm recovery checks in seconds; used when the gateway is started with --kubeconfig.
+poll_interval_seconds = 3
 
 # Explicit development-only destinations; overrides are accepted only for loopback nodes.
 # These ports override worker_port. Match each named worker's --port exactly, even when

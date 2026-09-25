@@ -1,5 +1,5 @@
 ---
-name: Test and publish worker image
+name: Test and publish images
 
 on:
   push:
@@ -42,46 +42,57 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
-      - name: Build local runtime image
+      - name: Build worker and gateway images
         env:
           SOURCE: ${{ github.server_url }}/${{ github.repository }}
           COMMIT: ${{ github.sha }}
         run: |
-          docker build --platform linux/amd64 -f Containerfile -t fractal-worker:ci \
-            --label "org.opencontainers.image.source=$SOURCE" \
-            --label "org.opencontainers.image.revision=$COMMIT" .
-      - name: Verify default worker entrypoint and installed application
+          for role in worker gateway; do
+            docker build --platform linux/amd64 --target "$role" \
+              -f Containerfile -t "fractal-$role:ci" \
+              --label "org.opencontainers.image.source=$SOURCE" \
+              --label "org.opencontainers.image.revision=$COMMIT" .
+          done
+      - name: Check bundled Helm and chart
         run: |
-          docker run --rm fractal-worker:ci --help
-          docker run --rm -i --entrypoint /opt/fractal/.venv/bin/python \
-            fractal-worker:ci - < scripts/smoke_image.py
+          docker run --rm --entrypoint helm fractal-gateway:ci version --short
+          docker run --rm --entrypoint helm fractal-gateway:ci template fractal-demo \
+            /opt/fractal/deploy/helm/fractal-demo --namespace fractal-demo \
+            --set gatewayUrl=http://192.168.1.1:8081
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish the tested image and report its immutable reference
+      - name: Publish images
         env:
           REPOSITORY: ${{ github.repository }}
           COMMIT: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          image="ghcr.io/${REPOSITORY,,}"
-          tag="$image:sha-$COMMIT"
-          docker tag fractal-worker:ci "$tag"
-          docker push "$tag"
-          reference=$(docker image inspect "$tag" \
-            --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "$image@sha256:")
-          test -n "$reference"
-          printf '%s\n' "$reference" > worker-image.txt
-          echo "Image: \`$tag\` — digest: \`$reference\`" >> "$GITHUB_STEP_SUMMARY"
-          docker tag fractal-worker:ci "$image:latest"
-          docker push "$image:latest"
-          echo "Latest: \`$image:latest\`" >> "$GITHUB_STEP_SUMMARY"
-      - name: Save the published reference
+          for role in worker gateway; do
+            image="ghcr.io/${REPOSITORY,,}"
+            if [ "$role" = gateway ]; then image="$image-gateway"; fi
+            tag="$image:sha-$COMMIT"
+            docker tag "fractal-$role:ci" "$tag"
+            docker push "$tag"
+            reference=$(docker image inspect "$tag" \
+              --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "$image@sha256:")
+            test -n "$reference"
+            printf '%s\n' "$reference" > "$role-image.txt"
+            docker tag "fractal-$role:ci" "$image:latest"
+          done
+          docker push "ghcr.io/${REPOSITORY,,}:latest"
+          docker push "ghcr.io/${REPOSITORY,,}-gateway:latest"
+      - name: Save the worker reference
         uses: actions/upload-artifact@v7
         with:
           name: worker-image-reference
           path: worker-image.txt
+      - name: Save the gateway reference
+        uses: actions/upload-artifact@v7
+        with:
+          name: gateway-image-reference
+          path: gateway-image.txt

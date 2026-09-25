@@ -46,13 +46,13 @@ h1 { margin: 0; font-size: clamp(19px, 2.5vw, 26px); letter-spacing: -.035em; }
 .formula span { margin-left: 8px; color: var(--muted); font: 12px var(--mono); }
 .toolbar label { gap: 9px; color: var(--muted); font-size: 12px; }
 .zoom-controls, .settings-actions { display: flex; gap: 6px; }
-.icon-button, .settings-actions button {
+.icon-button, .settings-actions button, .deployment-panel button {
   min-height: 38px; padding: 7px 12px; background: white; color: #152337;
   border: 1px solid #bcc9d8; border-radius: 6px; font-size: 13px;
 }
 .icon-button { width: 40px; padding: 7px; }
 .icon-button svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.icon-button:hover:not(:disabled), .settings-actions button:hover:not(:disabled) { background: #eaf5fa; }
+.icon-button:hover:not(:disabled), .settings-actions button:hover:not(:disabled), .deployment-panel button:hover:not(:disabled) { background: #eaf5fa; }
 .pan-button {
   position: absolute; z-index: 1;
   width: 38px; height: 48px; padding: 0; border: 1px solid #b6d6e5;
@@ -107,6 +107,7 @@ progress::-moz-progress-bar { background: linear-gradient(90deg, #0995b4, #8051c
 .pool-header { justify-content: space-between; flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 0; }
 .pool-header > span { color: var(--muted); font-size: 11px; }
+.deployment-panel { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-bottom: 13px; color: var(--muted); font-size: 13px; }
 .worker-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(225px, 1fr)); gap: 9px; margin: 0; padding: 0; list-style: none; }
 .worker-card { background: #f8fafc; border: 1px solid var(--line); border-left: 4px solid var(--node-color); border-radius: 6px; padding: 10px 11px; min-width: 0; }
 .worker-card.new-worker { animation: card-arrival 1.5s ease-out; }

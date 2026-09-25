@@ -44,7 +44,7 @@ uv run --frozen fractal-worker \
 
 Open **http://127.0.0.1:8080/** in one active browser window. Rendering starts as workers register.
 Stop a worker with Ctrl+C and restart it to observe its return with a new process identity.
-Ctrl+C lets admitted work finish before shutdown. Stop all three processes when finished.
+Stop all three processes when finished.
 
 ## Using the controls
 
@@ -60,6 +60,11 @@ Ctrl+C lets admitted work finish before shutdown. Stop all three processes when 
 Navigation uses accepted settings and preserves unapplied numeric edits. Completed frames repeat
 after the dwell interval. Hidden pages suspend new rendering until visible again.
 
+The status area reports the worker count, active requests, progress, and a rolling rate of successfully
+painted tiles. The worker count shows registrations, not Kubernetes readiness or free compute slots.
+A `?` means discovery is stale. LOST indicates contact loss, not confirmed node death.
+Throughput depends on the view, grid, iterations, hardware, and browser connection limits.
+
 Image width and height come from TOML. Columns and rows must divide those dimensions evenly,
 with at most 4,096 tiles and at most 256 × 256 pixels per tile. Iterations accept 1 through 10,000.
 Dwell and LOST durations accept 1 through 300,000 ms.
@@ -68,44 +73,32 @@ Accepted navigation and settings persist in browser storage under `fractal-demo.
 Each origin has separate settings, so changing the hostname or port changes which settings load.
 Saved values override the corresponding TOML defaults. After changing TOML, restart the gateway,
 reload the page, and click **Reset settings** to use the new defaults.
-Invalid saved values fall back to configured defaults. Storage failures display a notice while rendering continues.
-If clearing storage fails, saved overrides can return after reload. Palette selection is not saved.
 
 ## Configuration
+
+The gateway can also run in a container with Helm and host networking.
+See [Podman and rootful Quadlet deployment](docs/deployment.md#running-the-gateway-container).
 
 The gateway reads `--config PATH` at startup. Without a file, it uses loopback-only defaults.
 See [config.example.toml](config.example.toml) for all settings and their initial values.
 
-| Setting | Purpose |
-| --- | --- |
-| `bind`, `port` | Gateway interfaces and port; explicit addresses are required |
-| `node_networks` | Allowed advertised node IP networks |
-| `worker_port` | Destination port on each node |
-| `local_worker_ports` | Node-to-port overrides for loopback testing |
-| `expiry_seconds` | Worker registration lifetime |
-| `proxy_limit`, `render_limit` | Gateway and per-browser render concurrency |
-| `connect_timeout`, `upstream_timeout` | Upstream connection and total request deadlines, in seconds |
-| `default_palette` | `cyber` or `fire` |
-| `[geometry]`, `[view]` | Default raster, grid, coordinates, scale, and iterations |
-| `[timing]` | Browser polling, retry, render, dwell, and display timings, in milliseconds |
+For automatic deployment into a replacement cluster, start the gateway with `--kubeconfig PATH`.
+The gateway reads the provisioner's updated kubeconfig and restores a missing or failed Helm release.
+The dashboard shows deployment status and a **Redeploy workers** button for an immediate check.
+An installed release stays unchanged. Rendering resumes as workers register.
+Set the top-level `poll_interval_seconds` in TOML to adjust deployment checks. The default is 3 seconds.
+See [automatic kiosk deployment](docs/deployment.md#enabling-automatic-kiosk-deployment) for setup.
 
-Local port overrides take precedence over `worker_port`. Match each named worker's `--port` and
-each worker's `--gateway-url` to the gateway listener. Remove the override table for Kubernetes.
-The browser render deadline must exceed the gateway's upstream deadline.
+Keep these rules in mind:
 
-Worker command-line options override environment variables:
+- `bind` must list explicit interfaces for the deployment.
+- `local_worker_ports` overrides `worker_port` for loopback nodes. Match each named worker's `--port`
+  and each worker's `--gateway-url` to the gateway listener. Remove the table for Kubernetes.
+- The browser render deadline must exceed the gateway's upstream deadline.
 
-| Option | Environment variable | Default |
-| --- | --- | --- |
-| `--node` | `NODE_NAME` | Required |
-| `--host-ip` | `HOST_IP` | Required |
-| `--gateway-url` | `GATEWAY_URL` | Required plain HTTP origin |
-| `--bind` | `WORKER_BIND` | `0.0.0.0` |
-| `--port` | `WORKER_PORT` | `8080` |
-| `--registration-interval` | `REGISTRATION_INTERVAL` | 0.5 s |
-| `--registration-timeout` | `REGISTRATION_TIMEOUT` | 2 s |
-
-The gateway URL must be a plain HTTP origin, for example `http://192.0.2.1:8080`. HTTPS is rejected.
+Worker command-line options override environment variables. Run `fractal-worker --help` for the full
+list and defaults. The gateway URL must be a plain HTTP origin, for example `http://192.0.2.1:8080`.
+HTTPS is rejected.
 
 ## Operating limits
 
@@ -113,15 +106,12 @@ Use a trusted demo network. Registration and worker rendering have no authentica
 Keep the gateway and worker host ports off the shared conference network.
 The application does not configure firewalls or manage virtual machines.
 
-The worker count shows registrations, not Kubernetes readiness or free compute slots.
-A `?` means discovery is stale. LOST indicates contact loss, not confirmed node death.
-The tile rate counts successful paints over a rolling window.
-Throughput depends on the view, grid, iterations, hardware, and browser connection limits.
-
 Deploy workers with the Helm chart and values generated from the host TOML and libvirt network.
 See the [deployment guide](docs/deployment.md) for commands and image overrides.
-Cluster reconstruction requires restoring image-pull credentials and reinstalling the Helm release.
-Returning workers register automatically, but registration cannot recreate Kubernetes resources.
+Cluster reconstruction removes workload definitions and image-pull credentials.
+With `--kubeconfig`, the host gateway reinstalls the release. Private-image credentials require separate restoration.
+Without this flag, reinstall the release manually. See
+[Restoring and rolling back](docs/deployment.md#restoring-and-rolling-back).
 
 ## Documentation
 

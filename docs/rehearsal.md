@@ -19,7 +19,7 @@ Record failures with the settings and steps needed to reproduce them.
 ## Failure and recovery
 
 Select explicit targets in the disposable demo cluster before removing nodes.
-Keep the host gateway running and the renderer visible during node-loss checks.
+Keep the host gateway running during node-loss checks.
 
 ### Demonstrating worker loss
 
@@ -48,6 +48,25 @@ Keep the host gateway running and the renderer visible during node-loss checks.
       Reapplied workers register and complete the retained frame.
 - [ ] Restore the previous image and matching configuration. Verify registration and rendering.
 - [ ] Confirm healthy renders, responsive probes, and orderly shutdown under the deployed CPU and memory limits.
+
+### Checking automatic redeployment
+
+- [ ] Start the gateway with `--kubeconfig` pointing to the provisioner's continuously updated file.
+      Begin with the cluster absent. The gateway waits and the browser remains responsive.
+- [ ] Provision the cluster and update the kubeconfig. Confirm automatic installation, worker registration, and rendering.
+- [ ] Click **Redeploy workers**. Confirm that an installed release and the retained image stay unchanged.
+- [ ] Remove all cluster VMs through the provisioning dashboard, then recreate the cluster.
+      Confirm automatic deployment and resumed rendering without restarting the gateway or reloading the browser.
+- [ ] Repeat cluster replacement while the renderer page is hidden. Deployment continues, and rendering resumes when the page becomes visible.
+- [ ] Confirm that the locally served HTMX asset refreshes status and submits the button without external browser downloads.
+- [ ] Stop the recovery-enabled gateway before manual release maintenance or cleanup.
+
+### Checking container deployment
+
+- [ ] Start the gateway with the documented Podman command. Confirm worker registration and rendering.
+- [ ] Stop that container and start the Quadlet service. Check its journal and confirm rendering.
+- [ ] Recreate the cluster. Confirm the mounted kubeconfig replacement restores workers without restarting the gateway.
+- [ ] Reboot the demo host. Confirm the bridge, gateway service, and rendering return.
 
 If a check fails, inspect the gateway and worker logs using the [troubleshooting guide](deployment.md#troubleshooting).
 Restore any injected network faults. Repeat the failed check after correcting the cause.

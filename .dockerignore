@@ -6,6 +6,10 @@
 !src/
 !src/fractal_demo/
 !src/fractal_demo/**
+!deploy/
+!deploy/helm/
+!deploy/helm/fractal-demo/
+!deploy/helm/fractal-demo/**
 **/__pycache__/
 **/*.pyc
 **/*.pyo

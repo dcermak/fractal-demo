@@ -142,6 +142,7 @@ def test_installed_entrypoints_assets_and_worker_restart(installed):
             ("/static/app.js", b"import"),
             ("/static/scheduler.js", b"export"),
             ("/static/app.css", b"canvas"),
+            ("/static/vendor/htmx.min.js", b'version:"2.0.8"'),
         ):
             with HTTP.open(origin + asset, timeout=1) as response:
                 assert marker.lower() in response.read().lower()
